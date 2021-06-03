@@ -1,4 +1,4 @@
-module common-mod
+module github.com/songxuexian/common-mod
 
 go 1.16
 
