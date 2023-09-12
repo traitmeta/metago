@@ -1,0 +1,12 @@
+Database:
+  DbType: postgres  #数据库类型
+  DbName: metago  #数据库名称
+  Host: 172.22.215.113
+  Port: 5432
+  Username: postgres
+  Pwd: postgres
+  Charset: utf8  #数据库编码
+  ParseTime: True
+
+BlockChain:
+  RpcUrl: https://goerli.infura.io/v3/    #  区块链rpc地址  infura.io 可以获取 
