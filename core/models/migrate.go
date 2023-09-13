@@ -1,6 +1,6 @@
 package models
 
-import "github.com/traitmeta/metago/pkg/db"
+import "github.com/traitmeta/gotos/lib/db"
 
 // MigrateDb 初始化数据库表
 func MigrateDb() error {

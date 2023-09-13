@@ -1,9 +1,11 @@
 package dal
 
 import (
+	"context"
+
+	"github.com/traitmeta/gotos/lib/db"
 	"github.com/traitmeta/metago/core/common"
 	"github.com/traitmeta/metago/core/models"
-	"github.com/traitmeta/metago/pkg/db"
 )
 
 var Event *eventDal
@@ -14,15 +16,15 @@ func InitEventDal() {
 	Event = &eventDal{}
 }
 
-func (b *eventDal) Insert(event models.Event) error {
-	if err := db.DBEngine.Create(&event).Error; err != nil {
+func (b *eventDal) Insert(ctx context.Context, event models.Event) error {
+	if err := db.DBEngine.WithContext(ctx).Create(&event).Error; err != nil {
 		return err
 	}
 	return nil
 }
 
-func (t *eventDal) Inserts(events []models.Event) error {
-	if err := db.DBEngine.CreateInBatches(events, common.BatchSize).Error; err != nil {
+func (t *eventDal) Inserts(ctx context.Context, events []models.Event) error {
+	if err := db.DBEngine.WithContext(ctx).CreateInBatches(events, common.BatchSize).Error; err != nil {
 		return err
 	}
 

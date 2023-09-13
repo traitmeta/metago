@@ -1,9 +1,11 @@
 package dal
 
 import (
+	"context"
+
+	"github.com/traitmeta/gotos/lib/db"
 	"github.com/traitmeta/metago/core/common"
 	"github.com/traitmeta/metago/core/models"
-	"github.com/traitmeta/metago/pkg/db"
 )
 
 var Block *blockDal
@@ -14,15 +16,15 @@ func InitBlockDal() {
 	Block = &blockDal{}
 }
 
-func (b *blockDal) Insert(block models.Block) error {
-	if err := db.DBEngine.Create(&block).Error; err != nil {
+func (b *blockDal) Insert(ctx context.Context, block models.Block) error {
+	if err := db.DBEngine.WithContext(ctx).Create(&block).Error; err != nil {
 		return err
 	}
 	return nil
 }
 
-func (t *blockDal) Inserts(blocks []models.Block) error {
-	if err := db.DBEngine.CreateInBatches(blocks, common.BatchSize).Error; err != nil {
+func (t *blockDal) Inserts(ctx context.Context, blocks []models.Block) error {
+	if err := db.DBEngine.WithContext(ctx).CreateInBatches(blocks, common.BatchSize).Error; err != nil {
 		return err
 	}
 

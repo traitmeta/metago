@@ -4,12 +4,13 @@ import (
 	"log"
 
 	"github.com/spf13/viper"
+	"github.com/traitmeta/gotos/lib/db"
 	"github.com/traitmeta/metago/config/setting"
 )
 
 // global def
 var (
-	DB         *setting.DbConfig
+	DB         *db.DbConfig
 	BlockChain *setting.BlockChainConfig
 )
 

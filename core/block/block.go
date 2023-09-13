@@ -10,13 +10,14 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	log "github.com/sirupsen/logrus"
+	"github.com/traitmeta/gotos/lib/db"
 	"github.com/traitmeta/metago/config"
 	"github.com/traitmeta/metago/core/dal"
 	"github.com/traitmeta/metago/core/models"
 )
 
 // InitBlock 初始化第一个区块数据
-func InitBlock() {
+func InitBlock(ctx context.Context) {
 	block := models.Block{}
 	count, err := dal.Block.Counts()
 	if err != nil {
@@ -37,14 +38,14 @@ func InitBlock() {
 		block.BlockHeight = lastBlock.NumberU64()
 		block.LatestBlockHeight = lastBlock.NumberU64()
 		block.ParentHash = lastBlock.ParentHash().Hex()
-		err = dal.Block.Insert(block)
+		err = dal.Block.Insert(ctx, block)
 		if err != nil {
 			log.Panic("InitBlock - Insert block err : ", err)
 		}
 	}
 }
 
-func SyncTask() {
+func SyncTask(ctx context.Context) {
 	ticker := time.NewTicker(time.Second * 1)
 	defer ticker.Stop()
 	for range ticker.C {
@@ -69,7 +70,7 @@ func SyncTask() {
 		}
 
 		log.Printf("get currentBlock blockNumber : %v , blockHash : %v \n", currentBlock.Number(), currentBlock.Hash().Hex())
-		err = HandleBlock(currentBlock)
+		err = HandleBlock(ctx, currentBlock)
 		if err != nil {
 			log.Panic("HandleBlock error : ", err)
 		}
@@ -77,7 +78,7 @@ func SyncTask() {
 }
 
 // HandleBlock 处理区块信息
-func HandleBlock(currentBlock *types.Block) error {
+func HandleBlock(ctx context.Context, currentBlock *types.Block) error {
 	block := models.Block{
 		BlockHeight:       currentBlock.NumberU64(),
 		BlockHash:         currentBlock.Hash().Hex(),
@@ -90,22 +91,43 @@ func HandleBlock(currentBlock *types.Block) error {
 		return err
 	}
 
-	err = dal.Block.Insert(block)
-	if err != nil {
-		return err
-	}
-	err = dal.Transaction.Inserts(trxs)
-	if err != nil {
-		log.Error("insert transaction fail", "err", err)
+	return SyncToDB(ctx, block, trxs, events)
+}
+
+func SyncToDB(ctx context.Context, block models.Block, trxs []models.Transaction, events []models.Event) error {
+	tx := db.DBEngine.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	if err := tx.Error; err != nil {
 		return err
 	}
 
-	err = dal.Event.Inserts(events)
+	dbctx := context.WithValue(ctx, db.TxContext, tx)
+	err := dal.Block.Insert(dbctx, block)
 	if err != nil {
-		log.Error("insert transaction fail", "err", err)
+		tx.Rollback()
+		log.Error("insert block fail", "err", err)
 		return err
 	}
-	return nil
+	err = dal.Transaction.Inserts(dbctx, trxs)
+	if err != nil {
+		tx.Rollback()
+		log.Error("insert transactions fail", "err", err)
+		return err
+	}
+
+	err = dal.Event.Inserts(dbctx, events)
+	if err != nil {
+		tx.Rollback()
+		log.Error("insert events fail", "err", err)
+		return err
+	}
+
+	return tx.Commit().Error
 }
 
 // HandleTransaction 处理交易数据

@@ -1,9 +1,11 @@
 package dal
 
 import (
+	"context"
+
+	"github.com/traitmeta/gotos/lib/db"
 	"github.com/traitmeta/metago/core/common"
 	"github.com/traitmeta/metago/core/models"
-	"github.com/traitmeta/metago/pkg/db"
 )
 
 var Transaction *transactionDal
@@ -14,15 +16,15 @@ func InitTransactionDal() {
 	Transaction = &transactionDal{}
 }
 
-func (b *transactionDal) Insert(tranaction models.Transaction) error {
-	if err := db.DBEngine.Create(&tranaction).Error; err != nil {
+func (b *transactionDal) Insert(ctx context.Context, tranaction models.Transaction) error {
+	if err := db.DBEngine.WithContext(ctx).Create(&tranaction).Error; err != nil {
 		return err
 	}
 	return nil
 }
 
-func (t *transactionDal) Inserts(tranactions []models.Transaction) error {
-	if err := db.DBEngine.CreateInBatches(tranactions, common.BatchSize).Error; err != nil {
+func (t *transactionDal) Inserts(ctx context.Context, tranactions []models.Transaction) error {
+	if err := db.DBEngine.WithContext(ctx).CreateInBatches(tranactions, common.BatchSize).Error; err != nil {
 		return err
 	}
 
