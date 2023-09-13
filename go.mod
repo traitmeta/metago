@@ -5,13 +5,13 @@ go 1.21.1
 require (
 	github.com/99designs/gqlgen v0.17.20
 	github.com/ethereum/go-ethereum v1.10.17
+	github.com/shopspring/decimal v1.3.1
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/viper v1.16.0
 	github.com/traitmeta/gotos v0.0.0-20230913093511-88c1306eb2e7
 	github.com/vektah/gqlparser/v2 v2.5.1
 	golang.org/x/crypto v0.9.0
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
-	gorm.io/driver/postgres v1.5.2
 	gorm.io/gorm v1.25.4
 )
 
@@ -54,4 +54,5 @@ require (
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/driver/mysql v1.5.1 // indirect
+	gorm.io/driver/postgres v1.5.2 // indirect
 )
