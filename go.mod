@@ -5,6 +5,7 @@ go 1.16
 require (
 	github.com/99designs/gqlgen v0.17.20
 	github.com/ethereum/go-ethereum v1.10.17
+	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/viper v1.16.0
 	github.com/vektah/gqlparser/v2 v2.5.1
 	golang.org/x/crypto v0.9.0

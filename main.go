@@ -4,6 +4,8 @@ import (
 	"log"
 
 	"github.com/traitmeta/metago/config"
+	"github.com/traitmeta/metago/core/block"
+	"github.com/traitmeta/metago/core/dal"
 	"github.com/traitmeta/metago/core/models"
 	"github.com/traitmeta/metago/pkg/db"
 )
@@ -11,6 +13,7 @@ import (
 func init() {
 	config.SetupConfig()
 	db.SetupDBEngine()
+	config.SetupEthClient()
 	err := models.MigrateDb()
 	if err != nil {
 		log.Panic("config.MigrateDb error : ", err)
@@ -19,17 +22,9 @@ func init() {
 }
 
 func main() {
-	block := models.Blocks{
-		BlockHeight:       1,
-		BlockHash:         "hash",
-		ParentHash:        "parentHash",
-		LatestBlockHeight: 2,
-	}
-	err := block.Insert()
-	if err != nil {
-		log.Panic("block.Insert error : ", err)
-	}
+	dal.Init()
 
 	log.Println(config.BlockChain.RpcUrl)
-
+	block.InitBlock()
+	block.SyncTask()
 }
