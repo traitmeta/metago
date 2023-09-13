@@ -1,18 +1,19 @@
 package main
 
 import (
+	"context"
 	"log"
 
+	"github.com/traitmeta/gotos/lib/db"
 	"github.com/traitmeta/metago/config"
 	"github.com/traitmeta/metago/core/block"
 	"github.com/traitmeta/metago/core/dal"
 	"github.com/traitmeta/metago/core/models"
-	"github.com/traitmeta/metago/pkg/db"
 )
 
 func init() {
 	config.SetupConfig()
-	db.SetupDBEngine()
+	db.SetupDBEngine(*config.DB)
 	config.SetupEthClient()
 	err := models.MigrateDb()
 	if err != nil {
@@ -22,9 +23,10 @@ func init() {
 }
 
 func main() {
+	ctx := context.Background()
 	dal.Init()
 
 	log.Println(config.BlockChain.RpcUrl)
-	block.InitBlock()
-	block.SyncTask()
+	block.InitBlock(ctx)
+	block.SyncTask(ctx)
 }
