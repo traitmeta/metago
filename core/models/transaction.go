@@ -5,7 +5,8 @@ import (
 )
 
 type Transaction struct {
-	Id          uint64 `json:"id" gorm:"primary_key;AUTO_INCREMENT"`
+	*gorm.Model
+
 	BlockNumber uint64 `json:"block_number"`
 	TxHash      string `json:"tx_hash" gorm:"type:char(66)" `
 	From        string `json:"from" gorm:"type:char(42)" `
@@ -14,7 +15,6 @@ type Transaction struct {
 	Contract    string `json:"contract" gorm:"type:char(42)" `
 	Status      uint64 `json:"status"`
 	InputData   string `json:"input_data" gorm:"type:varchar(4096)"`
-	*gorm.Model
 }
 
 func (tx *Transaction) TableName() string {

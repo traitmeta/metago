@@ -7,7 +7,6 @@ import (
 type Event struct {
 	*gorm.Model
 
-	Id          uint64   `json:"id" gorm:"primary_key;AUTO_INCREMENT" `
 	Address     string   `json:"address" gorm:"type:char(42)" `
 	Topics      []string `json:"topics" gorm:"type:longtext" `
 	Data        string   `json:"data" gorm:"type:longtext" `
