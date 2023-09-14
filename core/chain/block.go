@@ -1,4 +1,4 @@
-package block
+package chain
 
 import (
 	"context"
@@ -199,14 +199,9 @@ func ProcessTransaction(tx *types.Transaction, blockNumber *big.Int, status uint
 
 func HandleTransactionEvent(rLog *types.Log, status uint64) (models.Event, error) {
 	log.Info("ProcessTransactionEvent", "address", rLog.Address, "data", rLog.Data)
-	topics := []string{}
-	for _, tp := range rLog.Topics {
-		topics = append(topics, tp.String())
-	}
 
 	event := models.Event{
 		Address:     rLog.Address.String(),
-		Topics:      topics,
 		Data:        common.Bytes2Hex(rLog.Data),
 		BlockNumber: rLog.BlockNumber,
 		TxHash:      rLog.TxHash.String(),
@@ -214,6 +209,19 @@ func HandleTransactionEvent(rLog *types.Log, status uint64) (models.Event, error
 		BlockHash:   rLog.BlockHash.String(),
 		LogIndex:    rLog.Index,
 		Removed:     rLog.Removed,
+	}
+
+	for i, tp := range rLog.Topics {
+		switch i {
+		case 0:
+			event.FirstTopic = tp.Hex()
+		case 1:
+			event.SecondTopic = tp.Hex()
+		case 2:
+			event.ThirdTopic = tp.Hex()
+		case 3:
+			event.FourthTopic = tp.Hex()
+		}
 	}
 
 	return event, nil
