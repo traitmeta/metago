@@ -1,0 +1,124 @@
+package abi
+
+import (
+	"math/big"
+	"reflect"
+	"testing"
+
+	"github.com/ethereum/go-ethereum/common"
+)
+
+func TestParseErc20TransferLog(t *testing.T) {
+	type args struct {
+		data []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *big.Int
+		wantErr bool
+	}{
+		{
+			name: "test erc20 transfer amount",
+			args: args{
+				data: common.Hex2Bytes("00000000000000000000000000000000000000000000000000000000005b8d80"),
+			},
+			want:    big.NewInt(6000000),
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseErc20TransferLog(tt.args.data)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ParseErc20TransferLog() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ParseErc20TransferLog() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseErc1155BatchTransferLog(t *testing.T) {
+	type args struct {
+		data []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []*big.Int
+		want1   []*big.Int
+		wantErr bool
+	}{
+		{
+			name: "test 1155 batch transfer log",
+			args: args{
+				data: common.Hex2Bytes("00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000240000000000000000000000000000000000000000000000000000000000000000f00000000000000000000000000000000000000000000000000000000000000840000000000000000000000000000000000000000000000000000000000000083000000000000000000000000000000000000000000000000000000000000007300000000000000000000000000000000000000000000000000000000000000740000000000000000000000000000000000000000000000000000000000000077000000000000000000000000000000000000000000000000000000000000006b000000000000000000000000000000000000000000000000000000000000007c00000000000000000000000000000000000000000000000000000000000000700000000000000000000000000000000000000000000000000000000000000072000000000000000000000000000000000000000000000000000000000000006a00000000000000000000000000000000000000000000000000000000000000750000000000000000000000000000000000000000000000000000000000000069000000000000000000000000000000000000000000000000000000000000006d00000000000000000000000000000000000000000000000000000000000000870000000000000000000000000000000000000000000000000000000000000086000000000000000000000000000000000000000000000000000000000000000f000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001"),
+			},
+			want: []*big.Int{
+				big.NewInt(132), big.NewInt(131), big.NewInt(115), big.NewInt(116), big.NewInt(119), big.NewInt(107), big.NewInt(124),
+				big.NewInt(112), big.NewInt(114), big.NewInt(106), big.NewInt(117), big.NewInt(105), big.NewInt(109), big.NewInt(135), big.NewInt(134),
+			},
+			want1: []*big.Int{
+				big.NewInt(1), big.NewInt(1), big.NewInt(1), big.NewInt(1), big.NewInt(1), big.NewInt(2), big.NewInt(2),
+				big.NewInt(1), big.NewInt(2), big.NewInt(1), big.NewInt(1), big.NewInt(1), big.NewInt(1), big.NewInt(1), big.NewInt(1),
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1, err := ParseErc1155BatchTransferLog(tt.args.data)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ParseErc1155BatchTransferLog() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ParseErc1155BatchTransferLog() got = %v, want %v", got, tt.want)
+			}
+			if !reflect.DeepEqual(got1, tt.want1) {
+				t.Errorf("ParseErc1155BatchTransferLog() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func TestParseErc1155SignleTransferLog(t *testing.T) {
+	type args struct {
+		data []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *big.Int
+		want1   *big.Int
+		wantErr bool
+	}{
+		{
+			name: "test 1155 transfer sigle",
+			args: args{
+				data: common.Hex2Bytes("00000000000000000000000000000000000000000000000000000000000000460000000000000000000000000000000000000000000000000000000000000001"),
+			},
+			want:    big.NewInt(70),
+			want1:   big.NewInt(1),
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1, err := ParseErc1155SignleTransferLog(tt.args.data)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ParseErc1155SignleTransferLog() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ParseErc1155SignleTransferLog() got = %v, want %v", got, tt.want)
+			}
+			if !reflect.DeepEqual(got1, tt.want1) {
+				t.Errorf("ParseErc1155SignleTransferLog() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
