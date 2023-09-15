@@ -24,7 +24,8 @@ import (
   | `:transaction_hash` | `:transaction_hash`            | Transaction of the transfer     |
   | `:address_hash`     | `:token_contract_address_hash` | Address of token's contract     |
   | `:index`            | `:log_index`                   | Index of log in transaction     |
-  """
+
+
 */
 
 func parseTokenType(topic common.Hash) string {
