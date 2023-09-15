@@ -1,15 +1,53 @@
 package abi
 
 import (
+	"log"
 	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/traitmeta/metago/config"
 	"github.com/traitmeta/metago/pkg/abi/erc1155"
 	"github.com/traitmeta/metago/pkg/abi/erc20"
 )
+
+func GetErc20Metadata(contractAddress string) (totalSupply *big.Int, name, symbol string, decimals uint8, err error) {
+	tokenAddress := common.HexToAddress(contractAddress)
+	instance, err := erc20.NewErc20(tokenAddress, config.EthRpcClient)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	totalSupply, err = instance.TotalSupply(nil)
+	if err != nil {
+		return
+	}
+
+	name, err = instance.Name(nil)
+	if err != nil {
+		return
+	}
+
+	decimals, err = instance.Decimals(nil)
+	if err != nil {
+		return
+	}
+
+	symbol, err = instance.Symbol(nil)
+	return
+}
+
+func GetErc20TotalSupply(contractAddress string) (*big.Int, error) {
+	tokenAddress := common.HexToAddress(contractAddress)
+	instance, err := erc20.NewErc20(tokenAddress, config.EthRpcClient)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return instance.TotalSupply(nil)
+}
 
 func ParseErc20TransferLog(data []byte) (*big.Int, error) {
 	contractAbi, err := abi.JSON(strings.NewReader(string(erc20.Erc20ABI)))
