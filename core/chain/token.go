@@ -2,6 +2,7 @@ package chain
 
 import (
 	"math/big"
+	"strings"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/traitmeta/metago/core/common"
@@ -126,7 +127,7 @@ func filterLogs(logs []models.Event) map[string][]models.Event {
 func doParseErc721(logs []models.Event, acc TokenTransfers) TokenTransfers {
 	for _, log := range logs {
 		token, tokenTransfer := doParseBaseTokenTransfer(log)
-		tokenTransfer.TokenId = big.NewInt(0).SetBytes(ethcommon.Hex2Bytes(log.FourthTopic))
+		tokenTransfer.TokenId = big.NewInt(0).SetBytes(ethcommon.FromHex(log.FourthTopic))
 		tokenTransfer.FromAddress = ethcommon.HexToAddress(log.SecondTopic).String()
 		tokenTransfer.ToAddress = ethcommon.HexToAddress(log.ThirdTopic).String()
 
@@ -143,7 +144,7 @@ func doParseErc721(logs []models.Event, acc TokenTransfers) TokenTransfers {
 func doParseErc20(logs []models.Event, acc TokenTransfers) (TokenTransfers, error) {
 	for _, log := range logs {
 		token, tokenTransfer := doParseBaseTokenTransfer(log)
-		amount, err := abi.ParseErc20TransferLog(ethcommon.Hex2Bytes(log.Data))
+		amount, err := abi.ParseErc20TransferLog(ethcommon.FromHex(log.Data))
 		if err != nil {
 			return acc, err
 		}
@@ -165,7 +166,7 @@ func doParseErc20(logs []models.Event, acc TokenTransfers) (TokenTransfers, erro
 func doParseWTH(logs []models.Event, acc TokenTransfers) (TokenTransfers, error) {
 	for _, log := range logs {
 		token, tokenTransfer := doParseBaseTokenTransfer(log)
-		amount, err := abi.ParseErc20TransferLog(ethcommon.Hex2Bytes(log.Data))
+		amount, err := abi.ParseErc20TransferLog(ethcommon.FromHex(log.Data))
 		if err != nil {
 			return acc, err
 		}
@@ -197,15 +198,16 @@ func doParseErc1155(logs []models.Event, acc TokenTransfers) (TokenTransfers, er
 
 		token.Type = common.ERC1155
 
-		if log.FirstTopic == common.ERC1155SingleTransferSignature {
-			tokenId, value, err := abi.ParseErc1155SignleTransferLog(ethcommon.Hex2Bytes(log.Data))
+		if strings.EqualFold(log.FirstTopic, common.ERC1155SingleTransferSignature) {
+			tokenId, value, err := abi.ParseErc1155SignleTransferLog(ethcommon.FromHex(log.Data))
 			if err != nil {
 				return acc, err
 			}
 			tokenTransfer.TokenId = tokenId
 			tokenTransfer.Amount = value
 		} else {
-			tokenIds, values, err := abi.ParseErc1155BatchTransferLog(ethcommon.Hex2Bytes(log.Data))
+			ethcommon.FromHex(log.Data)
+			tokenIds, values, err := abi.ParseErc1155BatchTransferLog(ethcommon.FromHex(log.Data))
 			if err != nil {
 				return acc, err
 			}
