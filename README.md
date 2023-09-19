@@ -10,10 +10,11 @@ An explorer with Golang.
 4. Test case
 
 ## API 
-1. Block
-2. Transaction
+1. ~~ Block ~~
+2. ~~ Transaction ~~
 3. Transaction Details
 4. Transaction Logs
 5. Transaction inner transaction
 6. Address
-7. Token  
+7. Token Metadata
+8. ~~ Token Transfer ~~

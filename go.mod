@@ -5,6 +5,7 @@ go 1.21.1
 require (
 	github.com/99designs/gqlgen v0.17.20
 	github.com/ethereum/go-ethereum v1.10.17
+	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/viper v1.16.0
 	github.com/traitmeta/gotos v0.0.0-20230913093511-88c1306eb2e7

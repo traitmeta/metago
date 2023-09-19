@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/pkg/errors"
 
 	"github.com/traitmeta/metago/config"
 	"github.com/traitmeta/metago/pkg/abi/erc1155"
@@ -22,20 +23,24 @@ func GetErc20Metadata(contractAddress string) (totalSupply *big.Int, name, symbo
 
 	totalSupply, err = instance.TotalSupply(nil)
 	if err != nil {
+		err = errors.WithMessage(err, "TotalSupply")
 		return
 	}
 
 	name, err = instance.Name(nil)
 	if err != nil {
+		err = errors.WithMessage(err, "Name")
 		return
 	}
 
 	decimals, err = instance.Decimals(nil)
 	if err != nil {
+		err = errors.WithMessage(err, "Decimals")
 		return
 	}
 
 	symbol, err = instance.Symbol(nil)
+	err = errors.WithMessage(err, "Symbol")
 	return
 }
 

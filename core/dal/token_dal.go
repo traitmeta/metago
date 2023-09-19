@@ -15,10 +15,20 @@ func InitTokenDal() {
 	Token = &tokenDal{}
 }
 
-func (b *tokenDal) Insert(ctx context.Context, block models.Block) error {
-	if err := db.DBEngine.WithContext(ctx).Create(&block).Error; err != nil {
+func (b *tokenDal) Insert(ctx context.Context, token models.Token) error {
+	if err := db.DBEngine.WithContext(ctx).Create(&token).Error; err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func (b *tokenDal) UpdateSkipMetadata(ctx context.Context, token models.Token) error {
+	token.SkipMetadata = true
+	if err := db.DBEngine.WithContext(ctx).Updates(&token).Error; err != nil {
+		return err
+	}
+
 	return nil
 }
 

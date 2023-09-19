@@ -12,7 +12,7 @@ type Token struct {
 	Name                      string   `json:"name,omitempty" gorm:"name; comment:Token名称;"`
 	Symbol                    string   `json:"symbol,omitempty" gorm:"symbol; comment:Token 缩写;"`
 	TotalSupply               *big.Int `json:"total_supply,omitempty" gorm:"total_supply; comment:总供应量;"`
-	Decimals                  string   `json:"decimals,omitempty" gorm:"decimals; comment:精度;"`
+	Decimals                  uint8    `json:"decimals,omitempty" gorm:"decimals; comment:精度;"`
 	Type                      string   `json:"type,omitempty" gorm:"type; comment:类型 ERC20, ERC721, ERC1155;"`
 	Cataloged                 bool     `json:"cataloged,omitempty" gorm:"cataloged; comment:归类;"`
 	ContractAddress           string   `json:"contract_address,omitempty" gorm:"contract_address; comment:合约地址;"`
