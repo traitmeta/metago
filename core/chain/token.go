@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
+
 	"github.com/traitmeta/metago/core/common"
 	"github.com/traitmeta/metago/core/models"
 	"github.com/traitmeta/metago/pkg/abi"
@@ -44,41 +45,45 @@ type TokenTransfers struct {
 	TokenTransfers []models.TokenTransfer
 }
 
-// TODO
 func ParseTokenTransfers(logs []models.Event) (tokenTransfers TokenTransfers, err error) {
 	tokenTransfers, err = doParse(logs, tokenTransfers)
 	if err != nil {
 		return
 	}
 
-	filteredTokenTransfers := []models.TokenTransfer{}
+	// 过滤销毁和铸造的交易
+	filteredSupplyTransfers := make(map[string]bool)
 	for _, tokenTransfer := range tokenTransfers.TokenTransfers {
 		if tokenTransfer.ToAddress == common.ZeroAddress || tokenTransfer.FromAddress == common.ZeroAddress {
-			filteredTokenTransfers = append(filteredTokenTransfers, tokenTransfer)
+			filteredSupplyTransfers[tokenTransfer.TokenContractAddress] = true
 		}
 	}
 
-	uniqueTokenContractAddresses := []string{}
-	for _, tokenTransfer := range filteredTokenTransfers {
-		uniqueTokenContractAddresses = appendIfMissing(uniqueTokenContractAddresses, tokenTransfer.TokenContractAddress)
+	uniqueTokens := make(map[string]models.Token)
+	for _, token := range tokenTransfers.Tokens {
+		uniqueTokens[token.ContractAddress] = token
 	}
 
 	// 处理totalSupply, 通过合约获取totalSupply, 目前看只有ERC20有这个方法
-	addTokens(uniqueTokenContractAddresses)
-
-	uniqueTokens := []models.Token{}
-	for _, token := range tokenTransfers.Tokens {
-		if contains(uniqueTokenContractAddresses, token.ContractAddress) {
-			uniqueTokens = append(uniqueTokens, token)
+	upsertTokens := []models.Token{}
+	for _, token := range uniqueTokens {
+		if _, ok := filteredSupplyTransfers[token.ContractAddress]; !ok {
+			continue
 		}
+
+		if totalSupply, err := abi.GetErc20TotalSupply(token.ContractAddress); err == nil {
+			token.TotalSupply = totalSupply
+		}
+
+		upsertTokens = append(upsertTokens, token)
 	}
 
-	tokenTransfersFromLogsUnique := TokenTransfers{
-		Tokens:         uniqueTokens,
-		TokenTransfers: filteredTokenTransfers,
+	tokenTransfers = TokenTransfers{
+		Tokens:         upsertTokens,
+		TokenTransfers: tokenTransfers.TokenTransfers,
 	}
 
-	return tokenTransfersFromLogsUnique, nil
+	return
 }
 
 func doParse(logs []models.Event, acc TokenTransfers) (TokenTransfers, error) {
@@ -235,26 +240,4 @@ func doParseBaseTokenTransfer(log models.Event) (token models.Token, tokenTransf
 	}
 
 	return
-}
-
-func appendIfMissing(slice []string, s string) []string {
-	for _, ele := range slice {
-		if ele == s {
-			return slice
-		}
-	}
-	return append(slice, s)
-}
-
-func contains(slice []string, s string) bool {
-	for _, ele := range slice {
-		if ele == s {
-			return true
-		}
-	}
-	return false
-}
-
-func addTokens(tokens []string) {
-	// TODO implementation for adding tokens
 }

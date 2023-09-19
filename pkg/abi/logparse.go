@@ -43,7 +43,7 @@ func GetErc20TotalSupply(contractAddress string) (*big.Int, error) {
 	tokenAddress := common.HexToAddress(contractAddress)
 	instance, err := erc20.NewErc20(tokenAddress, config.EthRpcClient)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	return instance.TotalSupply(nil)
