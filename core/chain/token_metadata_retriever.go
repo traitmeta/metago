@@ -56,7 +56,7 @@ This function will return a map with functions that were read in the Smart Contr
     It will retry to fetch each function in the Smart Contract according to :token_functions_reader_max_retries
     configured in the application env case one of them raised error.
 */
-func (m *TokenMetadataRetriever) getMetadata(tokenAddresses []string) (map[string]models.Token, error) {
+func (m *TokenMetadataRetriever) GetMetadata(tokenAddresses []string) (map[string]models.Token, error) {
 	tokenMaps := make(map[string]models.Token)
 	for _, contractAddress := range tokenAddresses {
 		totalSupply, name, symbols, decimals, err := abi.GetErc20Metadata(contractAddress)
