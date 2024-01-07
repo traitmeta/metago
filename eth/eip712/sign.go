@@ -19,16 +19,19 @@ func EIP712Sign(prv *ecdsa.PrivateKey, data *apitypes.TypedData) (string, error)
 	var signature string
 	dataHash, err := data.HashStruct(data.PrimaryType, data.Message)
 	if err != nil {
+		fmt.Println(dataHash.String())
 		return signature, errors.Wrap(err, "EIP712Sign calculate data hash falied")
 	}
 
 	domainSep, err := data.HashStruct(common.EIP712DomainField, data.Domain.Map())
 	if err != nil {
+		fmt.Println(domainSep.String())
 		return signature, errors.Wrap(err, "EIP712Sign calculate domain hash falied")
 	}
 
 	signData := []byte(fmt.Sprintf("\x19\x01%s%s", string(domainSep), string(dataHash)))
 	signDataDigest := crypto.Keccak256Hash(signData)
+	fmt.Println(signDataDigest.String())
 
 	sig, err := crypto.Sign(signDataDigest.Bytes(), prv)
 	if err != nil {
