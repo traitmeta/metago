@@ -22,14 +22,12 @@ func TestEIP712SignBiz_SignFoT(t *testing.T) {
 	}
 	tests := []struct {
 		name          string
-		b             *EIP712SignBiz
 		args          args
 		wantSignature string
 		wantErr       bool
 	}{
 		{
 			name: "test",
-			b:    &EIP712SignBiz{},
 			args: args{
 				priv: "2bdd8a43b8a055632f9a8b38d7c9463bfbe8340abbd6634f51bbf000cbe0ca50",
 			},
@@ -54,21 +52,18 @@ func TestEIP712SignBiz_SignFoT(t *testing.T) {
 func TestEIP712SignBiz_recover(t *testing.T) {
 	tests := []struct {
 		name              string
-		b                 *EIP712SignBiz
 		wantRecoveredAddr string
 		wantErr           bool
 	}{
 		{
 			name:              "test",
-			b:                 &EIP712SignBiz{},
 			wantRecoveredAddr: "",
 			wantErr:           false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := &EIP712SignBiz{}
-			gotRecoveredAddr, err := b.recover()
+			gotRecoveredAddr, err := recover()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("EIP712SignBiz.recover() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -86,14 +81,12 @@ func TestEIP712SignBiz_SignForZone(t *testing.T) {
 	}
 	tests := []struct {
 		name          string
-		b             *EIP712SignBiz
 		args          args
 		wantSignature string
 		wantErr       bool
 	}{
 		{
 			name: "test",
-			b:    &EIP712SignBiz{},
 			args: args{
 				priv: "7e5bfb82febc4c2c8529167104271ceec190eafdca277314912eaabdb67c6e5f",
 			},
@@ -103,8 +96,7 @@ func TestEIP712SignBiz_SignForZone(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := &EIP712SignBiz{}
-			gotSignature, err := b.SignForZone(tt.args.priv)
+			gotSignature, err := SignForZone(tt.args.priv)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("EIP712SignBiz.SignForZone() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -123,14 +115,12 @@ func TestEIP712SignBiz_SignForOrder(t *testing.T) {
 	}
 	tests := []struct {
 		name          string
-		b             *EIP712SignBiz
 		args          args
 		wantSignature string
 		wantErr       bool
 	}{
 		{
 			name: "test remix",
-			b:    &EIP712SignBiz{},
 			args: args{
 				priv:  "7e5bfb82febc4c2c8529167104271ceec190eafdca277314912eaabdb67c6e5f",
 				order: `{"types":{"OrderComponents":[{"name":"offerer","type":"address"},{"name":"zone","type":"address"},{"name":"offer","type":"OfferItem[]"},{"name":"consideration","type":"ConsiderationItem[]"},{"name":"orderType","type":"uint8"},{"name":"startTime","type":"uint256"},{"name":"endTime","type":"uint256"},{"name":"zoneHash","type":"bytes32"},{"name":"salt","type":"uint256"},{"name":"conduitKey","type":"bytes32"},{"name":"counter","type":"uint256"}],"OfferItem":[{"name":"itemType","type":"uint8"},{"name":"token","type":"address"},{"name":"identifierOrCriteria","type":"uint256"},{"name":"startAmount","type":"uint256"},{"name":"endAmount","type":"uint256"}],"ConsiderationItem":[{"name":"itemType","type":"uint8"},{"name":"token","type":"address"},{"name":"identifierOrCriteria","type":"uint256"},{"name":"startAmount","type":"uint256"},{"name":"endAmount","type":"uint256"},{"name":"recipient","type":"address"}],"EIP712Domain":[{"name":"name","type":"string"},{"name":"version","type":"string"},{"name":"chainId","type":"uint256"},{"name":"verifyingContract","type":"address"}]},"domain":{"name":"Seaport","version":"1.5","chainId":"1","verifyingContract":"0xd8b934580fce35a11b58c6d73adee468a2833fa8"},"primaryType":"OrderComponents","message":{"offerer":"0xab8483f64d9c6d1ecf9b849ae677dd3315835cb2","zone":"0x0000000000000000000000000000000000000000","offer":[{"itemType":"2","token":"0xf8e81d47203a594245e36c48e151709f0c19fbe8","identifierOrCriteria":"1","startAmount":"1","endAmount":"1"}],"consideration":[{"itemType":"0","token":"0x0000000000000000000000000000000000000000","identifierOrCriteria":"0","startAmount":"20000000","endAmount":"20000000","recipient":"0xab8483f64d9c6d1ecf9b849ae677dd3315835cb2"},{"itemType":"0","token":"0x0000000000000000000000000000000000000000","identifierOrCriteria":"0","startAmount":"1000000","endAmount":"1000000","recipient":"0x5b38da6a701c568545dcfcb03fcb875f56beddc4"}],"orderType":"0","startTime":"1291123844","endTime":"1791123844","zoneHash":"0x0000000000000000000000000000000000000000000000000000000000000000","salt":"24446860302761739304752683030156737591518664810215442929816108075358245614181","conduitKey":"0x0000000000000000000000000000000000000000000000000000000000000000","counter":"0"}}`,
@@ -140,7 +130,6 @@ func TestEIP712SignBiz_SignForOrder(t *testing.T) {
 		},
 		{
 			name: "test shate Order AS",
-			b:    &EIP712SignBiz{},
 			args: args{
 				priv:  "2bdd8a43b8a055632f9a8b38d7c9463bfbe8340abbd6634f51bbf000cbe0ca50",
 				order: testOrderData,
@@ -150,7 +139,6 @@ func TestEIP712SignBiz_SignForOrder(t *testing.T) {
 		},
 		{
 			name: "test shate Offer Qoe",
-			b:    &EIP712SignBiz{},
 			args: args{
 				priv:  "c52c5d5357b87fbbc73758d7f31e88ad80d7364101851749e501a80150da05ff",
 				order: testOfferData,
@@ -161,8 +149,7 @@ func TestEIP712SignBiz_SignForOrder(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := &EIP712SignBiz{}
-			gotSignature, err := b.SignForOrder(tt.args.priv, tt.args.order)
+			gotSignature, err := SignForOrder(tt.args.priv, tt.args.order)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("EIP712SignBiz.SignForOrder() error = %v, wantErr %v", err, tt.wantErr)
 				return

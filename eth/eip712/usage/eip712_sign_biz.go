@@ -16,15 +16,7 @@ import (
 	"github.com/traitmeta/metago/eth/eip712"
 )
 
-var BizEIP712Sign *EIP712SignBiz
-
-type EIP712SignBiz struct{}
-
-func init() {
-	BizEIP712Sign = &EIP712SignBiz{}
-}
-
-func (b *EIP712SignBiz) SignForOrder(priv string, order string) (signature string, err error) {
+func SignForOrder(priv string, order string) (signature string, err error) {
 	var td apitypes.TypedData
 	err = json.Unmarshal([]byte(order), &td)
 	prv, err := ethcrypto.HexToECDSA(priv)
@@ -296,7 +288,7 @@ func SignFoTest(priv string) (signature string, err error) {
 	return eip712.EIP712Sign(prv, &td)
 }
 
-func (b *EIP712SignBiz) recover() (recoveredAddr string, err error) {
+func recover() (recoveredAddr string, err error) {
 	sigBytes, err := hexutil.Decode("0xc5f7a27fb56690c5ca607b2ddc5efd58ca8b0290dab78a72a478e5d32e7facb562284309264b9cc0a09473e20ba5271587e3aa0bf9bc00b2296c560eb7b6035b1b")
 	if err != nil {
 		return recoveredAddr, errors.Wrap(err, "should be a hex string with 0x prefix")
@@ -317,7 +309,7 @@ func (b *EIP712SignBiz) recover() (recoveredAddr string, err error) {
 	return
 }
 
-func (b *EIP712SignBiz) SignForZone(priv string) (signature string, err error) {
+func SignForZone(priv string) (signature string, err error) {
 	var myTypedData = `
 	{
 		"types": {
