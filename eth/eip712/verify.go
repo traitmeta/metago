@@ -10,13 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-func Verifying(storedChallengeHash []byte, userAddress common.Address, incomingMetamaskSignature string) error {
-	// Fetch the previously stored challenge hash from your database
-	// var storedChallengeHash []byte = ...
-	// Fetch the ETH address whose signature you will be verifying
-	// var userAddress common.Address{} = ...
-	// Decode the hex-encoded signature from metamask.
-	signature, _ := hex.DecodeString(incomingMetamaskSignature)
+func Verifying(dataHash []byte, userAddress common.Address, signature string) error {
+	signatureBytes, _ := hex.DecodeString(signature)
 
 	if len(signature) != 65 {
 		return fmt.Errorf("invalid signature length: %d", len(signature))
@@ -25,9 +20,9 @@ func Verifying(storedChallengeHash []byte, userAddress common.Address, incomingM
 	if signature[64] != 27 && signature[64] != 28 {
 		return fmt.Errorf("invalid recovery id: %d", signature[64])
 	}
-	signature[64] -= 27
+	signatureBytes[64] -= 27
 
-	pubKeyRaw, err := crypto.Ecrecover(storedChallengeHash, signature)
+	pubKeyRaw, err := crypto.Ecrecover(dataHash, signatureBytes)
 	if err != nil {
 		return fmt.Errorf("invalid signature: %s", err.Error())
 	}
