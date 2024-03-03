@@ -18,10 +18,10 @@ const (
 // content_type, with a tag of 1, whose value is the MIME type of the body.
 // pointer, with a tag of 2, see pointer docs.
 // parent, with a tag of 3, see provenance.
-// metadata, with a tag of 5, see metadata.
-// metaprotocol, with a tag of 7, whose value is the metaprotocol identifier.
-// content_encoding, with a tag of 9, whose value is the encoding of the body.
-// delegate, with a tag of 11, see delegate.
+// TODO metadata, with a tag of 5, see metadata.
+// TODO metaprotocol, with a tag of 7, whose value is the metaprotocol identifier.
+// TODO content_encoding, with a tag of 9, whose value is the encoding of the body.
+// TODO delegate, with a tag of 11, see delegate.
 type Envelope struct {
 	Input       uint32
 	Offset      uint32
@@ -55,7 +55,7 @@ func (e *Envelope) GetPointer() uint64 {
 	return 0
 }
 
-// GetProvenance TODO little-endian OP_PUSH 3 TXID INDEX
+// GetProvenance little-endian OP_PUSH 3 TXID INDEX
 // TXID = 32-byte INDEX = 4-byte
 func (e *Envelope) GetProvenance() string {
 	v, ok := e.TypeDataMap[3]
