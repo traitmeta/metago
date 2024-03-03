@@ -1,6 +1,8 @@
 module github.com/traitmeta/metago
 
-go 1.22
+go 1.21.1
+
+toolchain go1.21.6
 
 require (
 	github.com/99designs/gqlgen v0.17.20
