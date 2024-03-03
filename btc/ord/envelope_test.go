@@ -35,7 +35,19 @@ func TestFromTapScript(t *testing.T) {
 				tapScript: witnessList[1],
 				input:     0,
 			},
-			want:    nil,
+			want: []Envelope{
+				{
+					Input:  0,
+					Offset: 0,
+					TypeDataMap: map[int][]byte{
+						1: []byte("text/plain;charset=utf-8"),
+						0: []byte("{ \n  \"p\": \"brc-20\",\n  \"op\": \"deploy\",\n  \"tick\": \"ordi\",\n  \"max\": \"21000000\",\n  \"lim\": \"1000\"\n}"),
+					},
+					Payload: []byte("\u0001text/plain;charset=utf-8{ \n  \"p\": \"brc-20\",\n  \"op\": \"deploy\",\n  \"tick\": \"ordi\",\n  \"max\": \"21000000\",\n  \"lim\": \"1000\"\n}"),
+					Pushnum: false,
+					Stutter: false,
+				},
+			},
 			wantLen: 1,
 			wantErr: false,
 		},
