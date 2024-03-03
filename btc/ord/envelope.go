@@ -3,6 +3,8 @@ package ord
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
+	"fmt"
 
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -54,12 +56,25 @@ func (e *Envelope) GetPointer() uint64 {
 }
 
 // GetProvenance TODO little-endian OP_PUSH 3 TXID INDEX
+// TXID = 32-byte INDEX = 4-byte
 func (e *Envelope) GetProvenance() string {
-	if v, ok := e.TypeDataMap[3]; ok {
-		return string(v)
+	v, ok := e.TypeDataMap[3]
+	if !ok {
+		return ""
 	}
 
-	return ""
+	bigEndian := make([]byte, 32)
+	for i := 0; i < 32; i++ {
+		bigEndian[i] = v[32-i-1]
+	}
+
+	txId := hex.EncodeToString(bigEndian)
+	var index uint64 = 0
+	if len(v) > 32 {
+		index = binary.LittleEndian.Uint64(v[32:])
+	}
+
+	return fmt.Sprintf("%si%d", txId, index)
 }
 
 func FromTransaction(transaction *wire.MsgTx) []Envelope {

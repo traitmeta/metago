@@ -35,19 +35,18 @@ func TestFromTapScript(t *testing.T) {
 				tapScript: witnessList[1],
 				input:     0,
 			},
-			want: []Envelope{
-				{
-					Input:  0,
-					Offset: 0,
-					TypeDataMap: map[int][]byte{
-						1: []byte("text/plain;charset=utf-8"),
-						0: []byte("{ \n  \"p\": \"brc-20\",\n  \"op\": \"deploy\",\n  \"tick\": \"ordi\",\n  \"max\": \"21000000\",\n  \"lim\": \"1000\"\n}"),
-					},
-					Payload: []byte("\u0001text/plain;charset=utf-8{ \n  \"p\": \"brc-20\",\n  \"op\": \"deploy\",\n  \"tick\": \"ordi\",\n  \"max\": \"21000000\",\n  \"lim\": \"1000\"\n}"),
-					Pushnum: false,
-					Stutter: false,
-				},
+			want:    nil,
+			wantLen: 1,
+			wantErr: false,
+		},
+		{
+			// txid : 84defb5e7db11f047b4bc58685b65654980be4a55e254a510048a71e0e43e532i0
+			name: "test tap Provenance",
+			args: args{
+				tapScript: witnessList[2],
+				input:     0,
 			},
+			want:    []Envelope{},
 			wantLen: 1,
 			wantErr: false,
 		},
@@ -71,6 +70,51 @@ func TestFromTapScript(t *testing.T) {
 				if !reflect.DeepEqual(got, tt.want) {
 					t.Errorf("FromTapScript() got = %v, want %v", got, tt.want)
 				}
+			}
+		})
+	}
+}
+
+func TestEnvelope_GetProvenance(t *testing.T) {
+	type args struct {
+		tapScript string
+		input     int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantLen int
+		wantErr bool
+	}{
+		{
+			// txid : 84defb5e7db11f047b4bc58685b65654980be4a55e254a510048a71e0e43e532i0
+			name: "test tap Provenance",
+			args: args{
+				tapScript: witnessList[2],
+				input:     0,
+			},
+			want:    "593015b9a76a11554f0a05c3b77a4723c6baaefb8bdd4175712a7320714b8ea8i0",
+			wantLen: 1,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tapScript, err := hex.DecodeString(tt.args.tapScript)
+			if err != nil {
+				t.Errorf("Decode TapScript err = %v", err)
+			}
+			got, err := FromTapScript(tapScript, tt.args.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("FromTapScript() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if len(got) != 1 {
+				t.Errorf("GetProvenance() = %v, want len %v", len(got), tt.want)
+			}
+			if provenance := got[0].GetProvenance(); provenance != tt.want {
+				t.Errorf("GetProvenance() = %v, want %v", provenance, tt.want)
 			}
 		})
 	}
