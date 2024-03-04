@@ -21,6 +21,12 @@ func (e *Element) String() string {
 }
 
 func (e *Element) IsValid(elements []Element) bool {
+	for _, char := range InvalidChar {
+		if strings.ContainsRune(e.name, char) {
+			return false
+		}
+	}
+
 	for _, src := range elements {
 		if strings.EqualFold(e.name, src.name) || (strings.EqualFold(e.pattern, e.pattern) && strings.EqualFold(e.field, e.field)) {
 			return false

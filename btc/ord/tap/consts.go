@@ -17,6 +17,9 @@ const (
 	Add        = "a"
 )
 
+// InvalidChar character in name
+var InvalidChar = []rune{'/', '.', '[', ']', '{', '}', ':', ';', '"', '\'', ' '}
+
 type Field struct {
 	FieldNum    int    `json:"field_num"`
 	FieldName   string `json:"field_name"`
