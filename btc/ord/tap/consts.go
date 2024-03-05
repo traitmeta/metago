@@ -17,6 +17,13 @@ const (
 	Add        = "a"
 )
 
+// Dmt Op
+const (
+	DmtDeploy     = "dmt-deploy"
+	DmtMint       = "dmt-mint"
+	TokenTransfer = "token-transfer"
+)
+
 // InvalidChar character in name
 var InvalidChar = []rune{'/', '.', '[', ']', '{', '}', ':', ';', '"', '\'', ' '}
 

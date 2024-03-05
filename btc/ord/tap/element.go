@@ -1,8 +1,12 @@
 package tap
 
 import (
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"strings"
+
+	"github.com/btcsuite/btcd/wire"
 )
 
 // Element format : <name>.<pattern>.<field>.element
@@ -34,4 +38,11 @@ func (e *Element) IsValid(elements []Element) bool {
 	}
 
 	return true
+}
+
+func (e *Element) IsAvailable(block *wire.MsgBlock) bool {
+	a := make([]byte, 4)
+	binary.BigEndian.PutUint32(a, block.Header.Bits)
+	hexBits := hex.EncodeToString(a)
+	return strings.Contains(hexBits, e.pattern)
 }
