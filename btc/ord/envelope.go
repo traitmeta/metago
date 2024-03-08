@@ -39,7 +39,7 @@ func (e *Envelope) GetContent() []byte {
 	return nil
 }
 
-func (e *Envelope) GetContextType() string {
+func (e *Envelope) GetContentType() string {
 	if v, ok := e.TypeDataMap[1]; ok {
 		return string(v)
 	}
@@ -47,6 +47,7 @@ func (e *Envelope) GetContextType() string {
 	return ""
 }
 
+// GetPointer Pointer
 func (e *Envelope) GetPointer() uint64 {
 	if v, ok := e.TypeDataMap[2]; ok {
 		return binary.LittleEndian.Uint64(v)
@@ -55,7 +56,7 @@ func (e *Envelope) GetPointer() uint64 {
 	return 0
 }
 
-// GetProvenance little-endian OP_PUSH 3 TXID INDEX
+// GetProvenance is parent little-endian OP_PUSH 3 TXID INDEX
 // TXID = 32-byte INDEX = 4-byte
 func (e *Envelope) GetProvenance() string {
 	v, ok := e.TypeDataMap[3]
@@ -63,6 +64,37 @@ func (e *Envelope) GetProvenance() string {
 		return ""
 	}
 
+	return covLittleEndianToOrdIdStr(v)
+}
+
+func (e *Envelope) GetContentEncoding() string {
+	if v, ok := e.TypeDataMap[9]; ok {
+		return string(v)
+	}
+
+	return ""
+}
+
+// TODO
+//func (e *Envelope) GetMetadata() string {
+//	if v, ok := e.TypeDataMap[5]; ok {
+//		err := cbor.Unmarshal(v, &atomicalToken)
+//		return string(v)
+//	}
+//
+//	return ""
+//}
+
+func (e *Envelope) GetDelegate() string {
+	v, ok := e.TypeDataMap[11]
+	if !ok {
+		return ""
+	}
+
+	return covLittleEndianToOrdIdStr(v)
+}
+
+func covLittleEndianToOrdIdStr(v []byte) string {
 	bigEndian := make([]byte, 32)
 	for i := 0; i < 32; i++ {
 		bigEndian[i] = v[32-i-1]

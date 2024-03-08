@@ -7,9 +7,11 @@ toolchain go1.21.6
 require (
 	github.com/99designs/gqlgen v0.17.20
 	github.com/ethereum/go-ethereum v1.10.17
+	github.com/fxamacker/cbor v1.5.1
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/viper v1.16.0
+	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/traitmeta/gotos v0.0.0-20230913093511-88c1306eb2e7
 	github.com/vektah/gqlparser/v2 v2.5.1
 	golang.org/x/crypto v0.9.0
@@ -24,6 +26,8 @@ require (
 	github.com/btcsuite/go-socks v0.0.0-20170105172521-4720035b7bfd // indirect
 	github.com/btcsuite/websocket v0.0.0-20150119174127-31079b680792 // indirect
 	github.com/decred/dcrd/crypto/blake256 v1.0.0 // indirect
+	github.com/golang/snappy v0.0.4 // indirect
+	github.com/x448/float16 v0.8.4 // indirect
 )
 
 require (
