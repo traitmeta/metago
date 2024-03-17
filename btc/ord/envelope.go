@@ -218,8 +218,8 @@ func FromInstructions(instructions *txscript.ScriptTokenizer, input int, offset 
 		}
 
 		opcode := instructions.Opcode()
-		switch {
-		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_ENDIF}):
+		switch opcode {
+		case txscript.OP_ENDIF:
 			return false, &Envelope{
 				Input:       uint32(input),
 				Offset:      uint32(offset),
@@ -228,65 +228,65 @@ func FromInstructions(instructions *txscript.ScriptTokenizer, input int, offset 
 				Pushnum:     pushnum,
 				Stutter:     stutter,
 			}
-		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_1NEGATE}):
+		case txscript.OP_1NEGATE:
 			pushnum = true
 			payload = append(payload, 0x81)
-		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_1}):
+		case txscript.OP_1:
 			pushnum = true
 			payload = append(payload, 0x01)
-		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_2}):
+		case txscript.OP_2:
 			pushnum = true
 			payload = append(payload, 0x02)
-		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_3}):
+		case txscript.OP_3:
 			pushnum = true
 			payload = append(payload, 0x03)
-		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_4}):
+		case txscript.OP_4:
 			pushnum = true
 			payload = append(payload, 0x04)
-		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_5}):
+		case txscript.OP_5:
 			pushnum = true
 			payload = append(payload, 0x05)
-		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_6}):
+		case txscript.OP_6:
 			pushnum = true
 			payload = append(payload, 0x06)
-		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_7}):
+		case txscript.OP_7:
 			pushnum = true
 			payload = append(payload, 0x07)
-		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_8}):
+		case txscript.OP_8:
 			pushnum = true
 			payload = append(payload, 0x08)
-		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_9}):
+		case txscript.OP_9:
 			pushnum = true
 			payload = append(payload, 0x09)
-		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_10}):
+		case txscript.OP_10:
 			pushnum = true
 			payload = append(payload, 0x0a)
-		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_11}):
+		case txscript.OP_11:
 			pushnum = true
 			payload = append(payload, 0x0b)
-		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_12}):
+		case txscript.OP_12:
 			pushnum = true
 			payload = append(payload, 0x0c)
-		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_13}):
+		case txscript.OP_13:
 			pushnum = true
 			payload = append(payload, 0x0d)
-		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_14}):
+		case txscript.OP_14:
 			pushnum = true
 			payload = append(payload, 0x0e)
-		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_15}):
+		case txscript.OP_15:
 			pushnum = true
 			payload = append(payload, 0x0f)
-		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_16}):
+		case txscript.OP_16:
 			pushnum = true
 			payload = append(payload, 0x10)
-		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_PUSHDATA1}), bytes.Equal([]byte{opcode}, []byte{txscript.OP_PUSHDATA2}), bytes.Equal([]byte{opcode}, []byte{txscript.OP_PUSHDATA4}):
+		case txscript.OP_PUSHDATA1, txscript.OP_PUSHDATA2, txscript.OP_PUSHDATA4:
 			if _, ok := typeDataMap[currentType]; !ok {
 				typeDataMap[currentType] = []byte{}
 			} else {
 				typeDataMap[currentType] = append(typeDataMap[currentType], instructions.Data()...)
 			}
 			payload = append(payload, instructions.Data()...)
-		case opcode == txscript.OP_DATA_1:
+		case txscript.OP_DATA_1:
 			data := instructions.Data()
 			currentType = int(data[0])
 			if _, ok := typeDataMap[currentType]; !ok {
@@ -296,22 +296,23 @@ func FromInstructions(instructions *txscript.ScriptTokenizer, input int, offset 
 			}
 			payload = append(payload, instructions.Data()...)
 		//	The next opcode bytes is data to be pushed onto the stack
-		case opcode > txscript.OP_DATA_1 && opcode <= txscript.OP_DATA_75:
-			data := instructions.Data()
-			if _, ok := typeDataMap[currentType]; !ok {
-				typeDataMap[currentType] = []byte{}
-			} else {
-				typeDataMap[currentType] = append(typeDataMap[currentType], data...)
-			}
-			payload = append(payload, instructions.Data()...)
-		case opcode == txscript.OP_0:
+		case txscript.OP_0:
 			currentType = 0
 			if _, ok := typeDataMap[currentType]; !ok {
 				typeDataMap[currentType] = []byte{}
 			}
-			continue
 		default:
-			return false, nil
+			if opcode > txscript.OP_DATA_1 && opcode <= txscript.OP_DATA_75 {
+				data := instructions.Data()
+				if _, ok := typeDataMap[currentType]; !ok {
+					typeDataMap[currentType] = []byte{}
+				} else {
+					typeDataMap[currentType] = append(typeDataMap[currentType], data...)
+				}
+				payload = append(payload, instructions.Data()...)
+			} else {
+				return false, nil
+			}
 		}
 	}
 }
