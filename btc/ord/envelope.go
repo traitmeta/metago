@@ -52,7 +52,7 @@ type Envelope struct {
 	Input       uint32
 	Offset      uint32
 	TypeDataMap map[int][]byte
-	Payload     []byte
+	Payload     [][]byte
 	Pushnum     bool
 	Stutter     bool
 }
@@ -208,7 +208,7 @@ func FromInstructions(instructions *txscript.ScriptTokenizer, input int, offset 
 	}
 
 	pushnum := false
-	payload := make([]byte, 0)
+	payload := [][]byte{}
 	typeDataMap := make(map[int][]byte)
 	currentType := 0
 	for {
@@ -230,62 +230,62 @@ func FromInstructions(instructions *txscript.ScriptTokenizer, input int, offset 
 			}
 		case txscript.OP_1NEGATE:
 			pushnum = true
-			payload = append(payload, 0x81)
+			payload = append(payload, []byte{0x81})
 		case txscript.OP_1:
 			pushnum = true
-			payload = append(payload, 0x01)
+			payload = append(payload, []byte{0x01})
 		case txscript.OP_2:
 			pushnum = true
-			payload = append(payload, 0x02)
+			payload = append(payload, []byte{0x02})
 		case txscript.OP_3:
 			pushnum = true
-			payload = append(payload, 0x03)
+			payload = append(payload, []byte{0x03})
 		case txscript.OP_4:
 			pushnum = true
-			payload = append(payload, 0x04)
+			payload = append(payload, []byte{0x04})
 		case txscript.OP_5:
 			pushnum = true
-			payload = append(payload, 0x05)
+			payload = append(payload, []byte{0x05})
 		case txscript.OP_6:
 			pushnum = true
-			payload = append(payload, 0x06)
+			payload = append(payload, []byte{0x06})
 		case txscript.OP_7:
 			pushnum = true
-			payload = append(payload, 0x07)
+			payload = append(payload, []byte{0x07})
 		case txscript.OP_8:
 			pushnum = true
-			payload = append(payload, 0x08)
+			payload = append(payload, []byte{0x08})
 		case txscript.OP_9:
 			pushnum = true
-			payload = append(payload, 0x09)
+			payload = append(payload, []byte{0x09})
 		case txscript.OP_10:
 			pushnum = true
-			payload = append(payload, 0x0a)
+			payload = append(payload, []byte{0x0a})
 		case txscript.OP_11:
 			pushnum = true
-			payload = append(payload, 0x0b)
+			payload = append(payload, []byte{0x0b})
 		case txscript.OP_12:
 			pushnum = true
-			payload = append(payload, 0x0c)
+			payload = append(payload, []byte{0x0c})
 		case txscript.OP_13:
 			pushnum = true
-			payload = append(payload, 0x0d)
+			payload = append(payload, []byte{0x0d})
 		case txscript.OP_14:
 			pushnum = true
-			payload = append(payload, 0x0e)
+			payload = append(payload, []byte{0x0e})
 		case txscript.OP_15:
 			pushnum = true
-			payload = append(payload, 0x0f)
+			payload = append(payload, []byte{0x0f})
 		case txscript.OP_16:
 			pushnum = true
-			payload = append(payload, 0x10)
+			payload = append(payload, []byte{0x10})
 		case txscript.OP_PUSHDATA1, txscript.OP_PUSHDATA2, txscript.OP_PUSHDATA4:
 			if _, ok := typeDataMap[currentType]; !ok {
 				typeDataMap[currentType] = []byte{}
 			} else {
 				typeDataMap[currentType] = append(typeDataMap[currentType], instructions.Data()...)
 			}
-			payload = append(payload, instructions.Data()...)
+			payload = append(payload, instructions.Data())
 		case txscript.OP_DATA_1:
 			data := instructions.Data()
 			currentType = int(data[0])
@@ -294,13 +294,14 @@ func FromInstructions(instructions *txscript.ScriptTokenizer, input int, offset 
 			} else {
 				typeDataMap[currentType] = append(typeDataMap[currentType], data...)
 			}
-			payload = append(payload, instructions.Data()...)
+			payload = append(payload, instructions.Data())
 		//	The next opcode bytes is data to be pushed onto the stack
 		case txscript.OP_0:
 			currentType = 0
 			if _, ok := typeDataMap[currentType]; !ok {
 				typeDataMap[currentType] = []byte{}
 			}
+			payload = append(payload, instructions.Data())
 		default:
 			if opcode > txscript.OP_DATA_1 && opcode <= txscript.OP_DATA_75 {
 				data := instructions.Data()
@@ -309,7 +310,7 @@ func FromInstructions(instructions *txscript.ScriptTokenizer, input int, offset 
 				} else {
 					typeDataMap[currentType] = append(typeDataMap[currentType], data...)
 				}
-				payload = append(payload, instructions.Data()...)
+				payload = append(payload, instructions.Data())
 			} else {
 				return false, nil
 			}
