@@ -14,6 +14,32 @@ const (
 	ProtocolId = "ord"
 )
 
+type ParsedEnvelope struct {
+	Input   uint32
+	Offset  uint32
+	Payload Inscription
+	Pushnum bool
+	Stutter bool
+}
+
+type Inscription struct {
+	Body                  []byte
+	ContentEncoding       []byte
+	ContentType           []byte
+	Delegate              []byte
+	DuplicateField        bool
+	IncompleteField       bool
+	Metadata              []byte
+	MetaProtocol          []byte
+	Parent                []byte
+	Pointer               []byte
+	UnRecognizedEvenField bool
+}
+
+func ParsedEnvelopeFromRaw(data Envelope) {
+
+}
+
 // Envelope
 // content_type, with a tag of 1, whose value is the MIME type of the body.
 // pointer, with a tag of 2, see pointer docs.
