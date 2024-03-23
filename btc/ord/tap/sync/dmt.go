@@ -2,7 +2,6 @@ package sync
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -276,129 +275,6 @@ func (s *DMTIndexer) HandleTx(blockHeight, blockTime int64, tx *wire.MsgTx) ([]m
 func MatchElementPattern(content string) bool {
 	re := regexp.MustCompile(common.ElementPattern)
 	return re.MatchString(content)
-}
-
-func (s *DMTIndexer) handlerDmtInscription(blockHeight int64, txId string, envelopes []envelops.Envelope) ([]model.TapActivity, []model.TapElementTick, error) {
-	var activities []model.TapActivity
-	deployTickToElementTick := make(map[string]model.TapElementTick)
-	mintTickBlockToBool := make(map[string]bool)
-	for _, envelope := range envelopes {
-		insData := ConvertToInscriptionData(envelope)
-		dmtOpr := &DmtOpr{}
-		err := json.Unmarshal(insData.Body, dmtOpr)
-		if err != nil {
-			continue
-		}
-
-		if !strings.EqualFold(dmtOpr.Protocol, common.TapProtocol) {
-			continue
-		}
-		body := ""
-		content := envelope.GetContent()
-		if content != nil {
-			body = string(content)
-			log.WithContext(s.ctx).WithField("body", body).Info("DMTIndexer handlerDmtInscription")
-		}
-
-		switch dmtOpr.Operation {
-		case common.DmtDeploy:
-			// 817708 00000000000000000001efa12ef8cf17d8521b8ba3de54433f2c14f3f929224d
-			// Check deploy是否合法
-			// 1. 缓存中存在表示本次deploy 无效
-			if _, ok := deployTickToElementTick[dmtOpr.Ticker]; ok {
-				continue
-			}
-
-			dbElemTick, err := s.dao.GetElementTickByTick(dmtOpr.Ticker, blockHeight)
-			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, nil, err
-			}
-			// 2. DB中存在比当前高度低的数据表示本次deploy 无效
-			if dbElemTick != nil {
-				deployTickToElementTick[dbElemTick.Tick] = *dbElemTick
-				continue
-			}
-
-			// 新的并且合法的Deploy 记录到缓存中
-			elemTick := model.TapElementTick{
-				ElementInscriptionId: dmtOpr.Element,
-				Tick:                 dmtOpr.Ticker,
-				TickInscriptionId:    fmt.Sprintf("%si%d", txId, envelope.Offset),
-				InscriptionHeight:    blockHeight,
-			}
-			deployTickToElementTick[dmtOpr.Ticker] = elemTick
-			activities = append(activities, model.TapActivity{
-				ElementInscriptionId: dmtOpr.Element,
-				Type:                 model.DeployType,
-				Tick:                 dmtOpr.Ticker,
-				Body:                 body,
-				InscriptionHeight:    blockHeight,
-				InscriptionId:        fmt.Sprintf("%si%d", txId, envelope.Offset),
-			})
-		case common.DmtMint:
-			// Check mint是否合法, 补全ElementInscriptionId
-			// 缓存中存在表示本次mint 无效
-			if _, ok := mintTickBlockToBool[fmt.Sprintf("%s:%s", dmtOpr.Ticker, dmtOpr.Block)]; ok {
-				continue
-			} else {
-				count, err := s.dao.CountMintActivityWithBlock(dmtOpr.Ticker, dmtOpr.Block, blockHeight)
-				if err != nil {
-					return nil, nil, err
-				}
-				// 数据库存在 mint无效
-				if count > 0 {
-					continue
-				}
-				// 数据库不存在本次有效，记录到缓存中
-				mintTickBlockToBool[fmt.Sprintf("%s:%s", dmtOpr.Ticker, dmtOpr.Block)] = true
-			}
-
-			elementInscriptionId := ""
-			// 这笔交易缓存中存在deploy的信息，则更新mint
-			if v, ok := deployTickToElementTick[dmtOpr.Ticker]; ok {
-				elementInscriptionId = v.ElementInscriptionId
-				v.Minted += 1
-			} else {
-				// 缓存没有，db没有，那么mint无效
-				dbElemTick, err := s.dao.GetElementTick(dmtOpr.Deploy, blockHeight)
-				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-					log.WithContext(s.ctx).
-						WithFields(log.Fields{"deploy": dmtOpr.Deploy, "block_height": blockHeight}).
-						Warn("DMTIndexer handlerDmtInscription")
-					return nil, nil, err
-				}
-				if dbElemTick == nil {
-					continue
-				}
-				// 缓存中没有，DB中有，则加入缓存，更新mint
-				if dbElemTick != nil {
-					elementInscriptionId = dbElemTick.ElementInscriptionId
-					dbElemTick.Minted += 1
-					deployTickToElementTick[dbElemTick.Tick] = *dbElemTick
-				}
-			}
-
-			activities = append(activities, model.TapActivity{
-				ElementInscriptionId: elementInscriptionId,
-				Type:                 model.MintType,
-				Tick:                 dmtOpr.Ticker,
-				Body:                 body,
-				BlockNumber:          dmtOpr.Block,
-				InscriptionHeight:    blockHeight,
-				InscriptionId:        fmt.Sprintf("%si%d", txId, envelope.Offset),
-			})
-		case common.DmtTransfer:
-		default:
-			continue
-		}
-	}
-
-	var deployTicks []model.TapElementTick
-	for _, v := range deployTickToElementTick {
-		deployTicks = append(deployTicks, v)
-	}
-
-	return activities, deployTicks, nil
 }
 
 func (s *DMTIndexer) RollBack(blockHeight int64, rollbackNumber int) error {

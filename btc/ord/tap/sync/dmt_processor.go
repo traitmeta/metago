@@ -15,6 +15,7 @@ import (
 	"github.com/traitmeta/metago/btc/ord/envelops"
 	"github.com/traitmeta/metago/btc/ord/tap/dal"
 	"github.com/traitmeta/metago/btc/ord/tap/model"
+	"github.com/traitmeta/metago/btc/ord/tap/protocol"
 )
 
 type DMTProcessor struct {
@@ -94,12 +95,13 @@ func (s *DMTProcessor) ProcessDeploy(blockHeight, blockTime int64, txId string, 
 	var deployTicks []model.TapElementTick
 	var deployActivities []model.TapActivity
 	for _, envelope := range envelopes {
-		dmt, err := EnvelopToDmtOpr(envelope)
-		if err != nil && !errors.Is(err, ErrNotTapProtocol) {
+		var dmt = &protocol.DMTDeploy{}
+		if err := EnvelopToDmtOpr(envelope, dmt); err != nil && !strings.EqualFold(dmt.Protocol, common.TapProtocol) {
 			log.WithContext(s.ctx).WithField("inscription_id", fmt.Sprintf("%si%d", txId, envelope.Offset)).
 				Debug("DMTIndexer ProcessDeploy EnvelopToDmtOpr fail")
 			continue
 		}
+
 		if dmt == nil || dmt.Operation != common.DmtDeploy {
 			continue
 		}
@@ -158,8 +160,8 @@ func (s *DMTProcessor) FilterValidDmtDeploy(deployTicks []model.TapElementTick, 
 func (s *DMTProcessor) ProcessMint(blockHeight int64, txId string, envelopes []envelops.Envelope) ([]model.TapActivity, error) {
 	var mintActivities []model.TapActivity
 	for _, envelope := range envelopes {
-		dmt, err := EnvelopToDmtOpr(envelope)
-		if err != nil && !errors.Is(err, ErrNotTapProtocol) {
+		var dmt = &protocol.DMTMint{}
+		if err := EnvelopToDmtOpr(envelope, dmt); err != nil && !errors.Is(err, ErrNotTapProtocol) {
 			log.WithContext(s.ctx).WithField("inscription_id", fmt.Sprintf("%si%d", txId, envelope.Offset)).
 				Debug("DMTIndexer ProcessMint EnvelopToDmtOpr fail")
 			continue
@@ -236,17 +238,12 @@ func (s *DMTProcessor) FilterValidDmtMint(mintActivities []model.TapActivity, th
 	return validMintActivities, nil
 }
 
-func EnvelopToDmtOpr(envelope envelops.Envelope) (*DmtOpr, error) {
+func EnvelopToDmtOpr(envelope envelops.Envelope, data interface{}) error {
 	insData := ConvertToInscriptionData(envelope)
-	dmtOpr := &DmtOpr{}
-	err := json.Unmarshal(insData.Body, dmtOpr)
+	err := json.Unmarshal(insData.Body, data)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	if !strings.EqualFold(dmtOpr.Protocol, common.TapProtocol) {
-		return nil, ErrNotTapProtocol
-	}
-
-	return dmtOpr, nil
+	return nil
 }

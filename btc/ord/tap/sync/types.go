@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+
+	"github.com/traitmeta/metago/btc/ord/envelops"
 )
 
 const ElementId = ".element"
@@ -20,20 +22,6 @@ type TickDetail struct {
 	ElementInscriptionId string `json:"element_inscription_id" gorm:"column:element_inscription_id;default:NULL"`
 	TickInscriptionId    string `json:"tick_inscription_id" gorm:"column:tick_inscription_id;default:NULL"`
 	InscriptionHeight    int64  `json:"inscription_height" gorm:"column:inscription_height;"`
-}
-
-type DmtOpr struct {
-	Protocol  string `json:"p"`
-	Operation string `json:"op"`
-	Element   string `json:"elem"`
-	Deploy    string `json:"dep"` // mint
-	Ticker    string `json:"tick"`
-	Project   string `json:"prj"`
-	Dimension string `json:"dim"`
-	DataTypes string `json:"dt"`
-	Id        string `json:"id"`
-	Block     string `json:"blk"` // mint
-	Amount    string `json:"amt"` // transfer
 }
 
 type Element struct {
@@ -83,4 +71,18 @@ type CachedKeys struct {
 	NoNameKeys []string
 	DeployKeys []string
 	MintKeys   []string
+}
+
+type InscriptionData struct {
+	ContentType string `json:"content_type"`
+	Body        []byte `json:"body"`
+	Destination string `json:"destination"`
+}
+
+func ConvertToInscriptionData(e envelops.Envelope) InscriptionData {
+	return InscriptionData{
+		ContentType: e.GetContentType(),
+		Body:        e.GetContent(),
+		Destination: "",
+	}
 }

@@ -1,4 +1,4 @@
-package tap
+package protocol
 
 import (
 	"encoding/binary"
