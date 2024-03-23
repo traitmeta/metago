@@ -1,4 +1,4 @@
-package sync
+package block
 
 import (
 	"context"
@@ -10,21 +10,23 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 
-	"github.com/traitmeta/metago/btc/ord/common"
-	"github.com/traitmeta/metago/btc/ord/tap/dal"
-	"github.com/traitmeta/metago/btc/ord/tap/model"
+	"github.com/traitmeta/metago/btc/block/dal"
+	"github.com/traitmeta/metago/btc/block/model"
 	"github.com/traitmeta/metago/btc/sync"
 )
 
-type BlockBitsIndexer struct {
+const TapBlock = "block"
+const RollBackBlockNumber = 3
+
+type Indexer struct {
 	ctx    context.Context
 	dal    *dal.Dal
 	client *rpcclient.Client
 	*sync.BaseSync
 }
 
-func New(ctx context.Context, client *rpcclient.Client, db *gorm.DB) *BlockBitsIndexer {
-	return &BlockBitsIndexer{
+func New(ctx context.Context, client *rpcclient.Client, db *gorm.DB) *Indexer {
+	return &Indexer{
 		ctx:      ctx,
 		dal:      dal.NewDal(db),
 		client:   client,
@@ -32,7 +34,7 @@ func New(ctx context.Context, client *rpcclient.Client, db *gorm.DB) *BlockBitsI
 	}
 }
 
-func (s *BlockBitsIndexer) Start() {
+func (s *Indexer) Start() {
 	s.Send()
 	for {
 		select {
@@ -49,8 +51,8 @@ func (s *BlockBitsIndexer) Start() {
 	}
 }
 
-func (s *BlockBitsIndexer) SyncBlock() error {
-	indexBlock, err := s.dal.GetSyncBlockByName(common.TapBlock)
+func (s *Indexer) SyncBlock() error {
+	indexBlock, err := s.dal.GetSyncBlockByName(TapBlock)
 	if err != nil {
 		return err
 	}
@@ -70,21 +72,21 @@ func (s *BlockBitsIndexer) SyncBlock() error {
 
 	log.WithContext(s.ctx).WithField("time_spend", time.Since(start)).Info("SyncBlock get block hash end")
 	// check fork
-	lastBlock, err := s.dal.GetSyncBlockByName(common.TapBlock)
+	lastBlock, err := s.dal.GetSyncBlockByName(TapBlock)
 	if err != nil {
 		return errors.New("cannot found block height info in db")
 	}
 
 	if lastBlock.BlockHeight > 0 && lastBlock.BlockHash != blockHeader.PrevBlock.String() {
 		// rollback
-		if err := s.RollBack(blockHeight, common.RollBackBlockNumber); err != nil {
+		if err := s.RollBack(blockHeight, RollBackBlockNumber); err != nil {
 			return err
 		}
-		blockHeight -= common.RollBackBlockNumber - 1 // 回滚后重新检查这个区块
+		blockHeight -= RollBackBlockNumber // 回滚后重新检查这个区块
 		return nil
 	}
 
-	blockBits := model.TapBlockBits{
+	blockBits := model.BlockInfo{
 		BlockNumber: blockHeight,
 		BlockHash:   blockHash.String(),
 		Bits:        strconv.FormatUint(uint64(blockHeader.Bits), 16),
@@ -94,21 +96,21 @@ func (s *BlockBitsIndexer) SyncBlock() error {
 		return err
 	}
 
-	if err := s.dal.UpdateBlockByName(common.TapBlock, blockHash.String(), blockHeight); err != nil {
+	if err := s.dal.UpdateBlockByName(TapBlock, blockHash.String(), blockHeight); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (s *BlockBitsIndexer) RollBack(blockHeight int64, backNumber int64) error {
+func (s *Indexer) RollBack(blockHeight int64, backNumber int64) error {
 	rollbackNumber := blockHeight - backNumber
 	blockHash, err := s.client.GetBlockHash(rollbackNumber)
 	if err != nil {
 		return err
 	}
 
-	if err := s.dal.UpdateBlockByName(common.TapBlock, blockHash.String(), rollbackNumber); err != nil {
+	if err := s.dal.UpdateBlockByName(TapBlock, blockHash.String(), rollbackNumber); err != nil {
 		return err
 	}
 	return nil
