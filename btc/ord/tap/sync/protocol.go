@@ -1,58 +1,36 @@
-package ord
+package sync
 
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
-	"fmt"
 
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 )
 
 const (
-	ProtocolId = "ord"
+	PROTOCOL_ID = "ord"
 )
 
-type ParsedEnvelope struct {
-	Input   uint32
-	Offset  uint32
-	Payload Inscription
-	Pushnum bool
-	Stutter bool
-}
-
-type Inscription struct {
-	Body                  []byte
-	ContentEncoding       []byte
-	ContentType           []byte
-	Delegate              []byte
-	DuplicateField        bool
-	IncompleteField       bool
-	Metadata              []byte
-	MetaProtocol          []byte
-	Parent                []byte
-	Pointer               []byte
-	UnRecognizedEvenField bool
-}
-
-func ParsedEnvelopeFromRaw(data Envelope) {
-
+type InscriptionData struct {
+	ContentType string `json:"content_type"`
+	Body        []byte `json:"body"`
+	Destination string `json:"destination"`
 }
 
 // Envelope
 // content_type, with a tag of 1, whose value is the MIME type of the body.
 // pointer, with a tag of 2, see pointer docs.
 // parent, with a tag of 3, see provenance.
-// TODO metadata, with a tag of 5, see metadata.
-// TODO metaprotocol, with a tag of 7, whose value is the metaprotocol identifier.
-// TODO content_encoding, with a tag of 9, whose value is the encoding of the body.
-// TODO delegate, with a tag of 11, see delegate.
+// metadata, with a tag of 5, see metadata.
+// metaprotocol, with a tag of 7, whose value is the metaprotocol identifier.
+// content_encoding, with a tag of 9, whose value is the encoding of the body.
+// delegate, with a tag of 11, see delegate.
 type Envelope struct {
 	Input       uint32
 	Offset      uint32
 	TypeDataMap map[int][]byte
-	Payload     [][]byte
+	Payload     []byte
 	Pushnum     bool
 	Stutter     bool
 }
@@ -65,7 +43,7 @@ func (e *Envelope) GetContent() []byte {
 	return nil
 }
 
-func (e *Envelope) GetContentType() string {
+func (e *Envelope) GetContextType() string {
 	if v, ok := e.TypeDataMap[1]; ok {
 		return string(v)
 	}
@@ -73,7 +51,6 @@ func (e *Envelope) GetContentType() string {
 	return ""
 }
 
-// GetPointer Pointer
 func (e *Envelope) GetPointer() uint64 {
 	if v, ok := e.TypeDataMap[2]; ok {
 		return binary.LittleEndian.Uint64(v)
@@ -82,57 +59,37 @@ func (e *Envelope) GetPointer() uint64 {
 	return 0
 }
 
-// GetProvenance is parent little-endian OP_PUSH 3 TXID INDEX
-// TXID = 32-byte INDEX = 4-byte
+// GetProvenance TODO little-endian OP_PUSH 3 TXID INDEX
 func (e *Envelope) GetProvenance() string {
-	v, ok := e.TypeDataMap[3]
-	if !ok {
-		return ""
-	}
-
-	return covLittleEndianToOrdIdStr(v)
-}
-
-func (e *Envelope) GetContentEncoding() string {
-	if v, ok := e.TypeDataMap[9]; ok {
+	if v, ok := e.TypeDataMap[3]; ok {
 		return string(v)
 	}
 
 	return ""
 }
 
-// TODO
-//func (e *Envelope) GetMetadata() string {
-//	if v, ok := e.TypeDataMap[5]; ok {
-//		err := cbor.Unmarshal(v, &atomicalToken)
-//		return string(v)
-//	}
-//
-//	return ""
-//}
-
-func (e *Envelope) GetDelegate() string {
-	v, ok := e.TypeDataMap[11]
-	if !ok {
-		return ""
+// ConvertToInscriptionData TODO fill Destination
+func (e *Envelope) ConvertToInscriptionData() InscriptionData {
+	return InscriptionData{
+		ContentType: e.GetContextType(),
+		Body:        e.GetContent(),
+		Destination: "",
 	}
-
-	return covLittleEndianToOrdIdStr(v)
 }
 
-func covLittleEndianToOrdIdStr(v []byte) string {
-	bigEndian := make([]byte, 32)
-	for i := 0; i < 32; i++ {
-		bigEndian[i] = v[32-i-1]
+func FromWitnessTOInscriptionData(witness []byte, inputIdx int) []InscriptionData {
+	envelopes := make([]Envelope, 0)
+	envelopes, err := FromTapScript(witness, inputIdx)
+	if err != nil {
+		return nil
 	}
 
-	txId := hex.EncodeToString(bigEndian)
-	var index uint64 = 0
-	if len(v) > 32 {
-		index = binary.LittleEndian.Uint64(v[32:])
+	var resp []InscriptionData
+	for _, e := range envelopes {
+		resp = append(resp, e.ConvertToInscriptionData())
 	}
 
-	return fmt.Sprintf("%si%d", txId, index)
+	return resp
 }
 
 func FromTransaction(transaction *wire.MsgTx) []Envelope {
@@ -199,7 +156,7 @@ func FromInstructions(instructions *txscript.ScriptTokenizer, input int, offset 
 		return stutter, nil
 	}
 	opcode := instructions.Opcode()
-	if !bytes.Equal([]byte{opcode}, []byte{txscript.OP_DATA_3}) || !bytes.Equal(instructions.Data(), []byte(ProtocolId)) {
+	if !bytes.Equal([]byte{opcode}, []byte{txscript.OP_DATA_3}) || !bytes.Equal(instructions.Data(), []byte(PROTOCOL_ID)) {
 		stutter := Accept(instructions, []byte{})
 		if stutter {
 			return stutter, nil
@@ -208,7 +165,7 @@ func FromInstructions(instructions *txscript.ScriptTokenizer, input int, offset 
 	}
 
 	pushnum := false
-	payload := [][]byte{}
+	payload := make([]byte, 0)
 	typeDataMap := make(map[int][]byte)
 	currentType := 0
 	for {
@@ -218,8 +175,8 @@ func FromInstructions(instructions *txscript.ScriptTokenizer, input int, offset 
 		}
 
 		opcode := instructions.Opcode()
-		switch opcode {
-		case txscript.OP_ENDIF:
+		switch {
+		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_ENDIF}):
 			return false, &Envelope{
 				Input:       uint32(input),
 				Offset:      uint32(offset),
@@ -228,65 +185,65 @@ func FromInstructions(instructions *txscript.ScriptTokenizer, input int, offset 
 				Pushnum:     pushnum,
 				Stutter:     stutter,
 			}
-		case txscript.OP_1NEGATE:
+		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_1NEGATE}):
 			pushnum = true
-			payload = append(payload, []byte{0x81})
-		case txscript.OP_1:
+			payload = append(payload, 0x81)
+		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_1}):
 			pushnum = true
-			payload = append(payload, []byte{0x01})
-		case txscript.OP_2:
+			payload = append(payload, 0x01)
+		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_2}):
 			pushnum = true
-			payload = append(payload, []byte{0x02})
-		case txscript.OP_3:
+			payload = append(payload, 0x02)
+		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_3}):
 			pushnum = true
-			payload = append(payload, []byte{0x03})
-		case txscript.OP_4:
+			payload = append(payload, 0x03)
+		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_4}):
 			pushnum = true
-			payload = append(payload, []byte{0x04})
-		case txscript.OP_5:
+			payload = append(payload, 0x04)
+		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_5}):
 			pushnum = true
-			payload = append(payload, []byte{0x05})
-		case txscript.OP_6:
+			payload = append(payload, 0x05)
+		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_6}):
 			pushnum = true
-			payload = append(payload, []byte{0x06})
-		case txscript.OP_7:
+			payload = append(payload, 0x06)
+		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_7}):
 			pushnum = true
-			payload = append(payload, []byte{0x07})
-		case txscript.OP_8:
+			payload = append(payload, 0x07)
+		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_8}):
 			pushnum = true
-			payload = append(payload, []byte{0x08})
-		case txscript.OP_9:
+			payload = append(payload, 0x08)
+		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_9}):
 			pushnum = true
-			payload = append(payload, []byte{0x09})
-		case txscript.OP_10:
+			payload = append(payload, 0x09)
+		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_10}):
 			pushnum = true
-			payload = append(payload, []byte{0x0a})
-		case txscript.OP_11:
+			payload = append(payload, 0x0a)
+		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_11}):
 			pushnum = true
-			payload = append(payload, []byte{0x0b})
-		case txscript.OP_12:
+			payload = append(payload, 0x0b)
+		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_12}):
 			pushnum = true
-			payload = append(payload, []byte{0x0c})
-		case txscript.OP_13:
+			payload = append(payload, 0x0c)
+		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_13}):
 			pushnum = true
-			payload = append(payload, []byte{0x0d})
-		case txscript.OP_14:
+			payload = append(payload, 0x0d)
+		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_14}):
 			pushnum = true
-			payload = append(payload, []byte{0x0e})
-		case txscript.OP_15:
+			payload = append(payload, 0x0e)
+		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_15}):
 			pushnum = true
-			payload = append(payload, []byte{0x0f})
-		case txscript.OP_16:
+			payload = append(payload, 0x0f)
+		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_16}):
 			pushnum = true
-			payload = append(payload, []byte{0x10})
-		case txscript.OP_PUSHDATA1, txscript.OP_PUSHDATA2, txscript.OP_PUSHDATA4:
+			payload = append(payload, 0x10)
+		case bytes.Equal([]byte{opcode}, []byte{txscript.OP_PUSHDATA1}), bytes.Equal([]byte{opcode}, []byte{txscript.OP_PUSHDATA2}), bytes.Equal([]byte{opcode}, []byte{txscript.OP_PUSHDATA4}):
 			if _, ok := typeDataMap[currentType]; !ok {
 				typeDataMap[currentType] = []byte{}
 			} else {
 				typeDataMap[currentType] = append(typeDataMap[currentType], instructions.Data()...)
 			}
-			payload = append(payload, instructions.Data())
-		case txscript.OP_DATA_1:
+			payload = append(payload, instructions.Data()...)
+		case opcode == txscript.OP_DATA_1:
 			data := instructions.Data()
 			currentType = int(data[0])
 			if _, ok := typeDataMap[currentType]; !ok {
@@ -294,26 +251,24 @@ func FromInstructions(instructions *txscript.ScriptTokenizer, input int, offset 
 			} else {
 				typeDataMap[currentType] = append(typeDataMap[currentType], data...)
 			}
-			payload = append(payload, instructions.Data())
+			payload = append(payload, instructions.Data()...)
 		//	The next opcode bytes is data to be pushed onto the stack
-		case txscript.OP_0:
+		case opcode > txscript.OP_DATA_1 && opcode <= txscript.OP_DATA_75:
+			data := instructions.Data()
+			if _, ok := typeDataMap[currentType]; !ok {
+				typeDataMap[currentType] = []byte{}
+			} else {
+				typeDataMap[currentType] = append(typeDataMap[currentType], data...)
+			}
+			payload = append(payload, instructions.Data()...)
+		case opcode == txscript.OP_0:
 			currentType = 0
 			if _, ok := typeDataMap[currentType]; !ok {
 				typeDataMap[currentType] = []byte{}
 			}
-			payload = append(payload, instructions.Data())
+			continue
 		default:
-			if opcode > txscript.OP_DATA_1 && opcode <= txscript.OP_DATA_75 {
-				data := instructions.Data()
-				if _, ok := typeDataMap[currentType]; !ok {
-					typeDataMap[currentType] = []byte{}
-				} else {
-					typeDataMap[currentType] = append(typeDataMap[currentType], data...)
-				}
-				payload = append(payload, instructions.Data())
-			} else {
-				return false, nil
-			}
+			return false, nil
 		}
 	}
 }
