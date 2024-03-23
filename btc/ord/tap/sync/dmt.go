@@ -18,8 +18,10 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/traitmeta/metago/btc/ord/common"
+	"github.com/traitmeta/metago/btc/ord/envelops"
 	"github.com/traitmeta/metago/btc/ord/tap/dal"
 	"github.com/traitmeta/metago/btc/ord/tap/model"
+	"github.com/traitmeta/metago/btc/sync"
 )
 
 type DMTIndexer struct {
@@ -29,7 +31,7 @@ type DMTIndexer struct {
 	client    *rpcclient.Client
 	processor *DMTProcessor
 	cache     *Cache
-	BaseSync
+	*sync.BaseSync
 }
 
 func NewDMTIndexer(ctx context.Context, client *rpcclient.Client, db *gorm.DB, cache *Cache, rds *redis.Client) *DMTIndexer {
@@ -40,14 +42,12 @@ func NewDMTIndexer(ctx context.Context, client *rpcclient.Client, db *gorm.DB, c
 		client:    client,
 		processor: NewDMTProcessor(ctx, db, cache),
 		cache:     cache,
-		BaseSync: BaseSync{
-			ch: make(chan bool, 1),
-		},
+		BaseSync:  sync.NewBaseSync(),
 	}
 }
 
 func (s *DMTIndexer) Start() {
-	s.ch <- true
+	s.Send()
 	for {
 		select {
 		case <-s.Receive():
@@ -255,7 +255,7 @@ func (s *DMTIndexer) HandleTx(blockHeight, blockTime int64, tx *wire.MsgTx) ([]m
 		return nil, nil, nil, nil, nil
 	}
 
-	envelopes := FromTransaction(tx)
+	envelopes := envelops.FromTransaction(tx)
 	if len(envelopes) == 0 {
 		return nil, nil, nil, nil, nil
 	}
@@ -278,12 +278,12 @@ func MatchElementPattern(content string) bool {
 	return re.MatchString(content)
 }
 
-func (s *DMTIndexer) handlerDmtInscription(blockHeight int64, txId string, envelopes []Envelope) ([]model.TapActivity, []model.TapElementTick, error) {
+func (s *DMTIndexer) handlerDmtInscription(blockHeight int64, txId string, envelopes []envelops.Envelope) ([]model.TapActivity, []model.TapElementTick, error) {
 	var activities []model.TapActivity
 	deployTickToElementTick := make(map[string]model.TapElementTick)
 	mintTickBlockToBool := make(map[string]bool)
 	for _, envelope := range envelopes {
-		insData := envelope.ConvertToInscriptionData()
+		insData := ConvertToInscriptionData(envelope)
 		dmtOpr := &DmtOpr{}
 		err := json.Unmarshal(insData.Body, dmtOpr)
 		if err != nil {

@@ -13,28 +13,27 @@ import (
 	"github.com/traitmeta/metago/btc/ord/common"
 	"github.com/traitmeta/metago/btc/ord/tap/dal"
 	"github.com/traitmeta/metago/btc/ord/tap/model"
+	"github.com/traitmeta/metago/btc/sync"
 )
 
 type BlockBitsIndexer struct {
 	ctx    context.Context
 	dal    *dal.Dal
 	client *rpcclient.Client
-	BaseSync
+	*sync.BaseSync
 }
 
 func New(ctx context.Context, client *rpcclient.Client, db *gorm.DB) *BlockBitsIndexer {
 	return &BlockBitsIndexer{
-		ctx:    ctx,
-		dal:    dal.NewDal(db),
-		client: client,
-		BaseSync: BaseSync{
-			ch: make(chan bool, 1),
-		},
+		ctx:      ctx,
+		dal:      dal.NewDal(db),
+		client:   client,
+		BaseSync: sync.NewBaseSync(),
 	}
 }
 
 func (s *BlockBitsIndexer) Start() {
-	s.ch <- true
+	s.Send()
 	for {
 		select {
 		case <-s.Receive():

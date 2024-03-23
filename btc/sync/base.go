@@ -4,6 +4,10 @@ type BaseSync struct {
 	ch chan bool
 }
 
+func NewBaseSync() *BaseSync {
+	return &BaseSync{ch: make(chan bool, 1)}
+}
+
 func (b *BaseSync) Receive() <-chan bool {
 	return b.ch
 }

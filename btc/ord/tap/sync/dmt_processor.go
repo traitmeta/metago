@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/traitmeta/metago/btc/ord/common"
+	"github.com/traitmeta/metago/btc/ord/envelops"
 	"github.com/traitmeta/metago/btc/ord/tap/dal"
 	"github.com/traitmeta/metago/btc/ord/tap/model"
 )
@@ -30,10 +31,10 @@ func NewDMTProcessor(ctx context.Context, db *gorm.DB, cache *Cache) *DMTProcess
 	}
 }
 
-func (s *DMTProcessor) ProcessElement(blockHeight int64, txId string, envelopes []Envelope) []model.TapElement {
+func (s *DMTProcessor) ProcessElement(blockHeight int64, txId string, envelopes []envelops.Envelope) []model.TapElement {
 	var elements []model.TapElement
 	for _, envelope := range envelopes {
-		insData := envelope.ConvertToInscriptionData()
+		insData := ConvertToInscriptionData(envelope)
 		if !strings.Contains(insData.ContentType, "text") {
 			continue
 		}
@@ -89,7 +90,7 @@ func (s *DMTProcessor) FilterValidElement(elements []model.TapElement) []model.T
 	return validElements
 }
 
-func (s *DMTProcessor) ProcessDeploy(blockHeight, blockTime int64, txId string, envelopes []Envelope) ([]model.TapElementTick, []model.TapActivity, error) {
+func (s *DMTProcessor) ProcessDeploy(blockHeight, blockTime int64, txId string, envelopes []envelops.Envelope) ([]model.TapElementTick, []model.TapActivity, error) {
 	var deployTicks []model.TapElementTick
 	var deployActivities []model.TapActivity
 	for _, envelope := range envelopes {
@@ -154,7 +155,7 @@ func (s *DMTProcessor) FilterValidDmtDeploy(deployTicks []model.TapElementTick, 
 	return validDeployTick, validDeployActivities, nil
 }
 
-func (s *DMTProcessor) ProcessMint(blockHeight int64, txId string, envelopes []Envelope) ([]model.TapActivity, error) {
+func (s *DMTProcessor) ProcessMint(blockHeight int64, txId string, envelopes []envelops.Envelope) ([]model.TapActivity, error) {
 	var mintActivities []model.TapActivity
 	for _, envelope := range envelopes {
 		dmt, err := EnvelopToDmtOpr(envelope)
@@ -235,8 +236,8 @@ func (s *DMTProcessor) FilterValidDmtMint(mintActivities []model.TapActivity, th
 	return validMintActivities, nil
 }
 
-func EnvelopToDmtOpr(envelope Envelope) (*DmtOpr, error) {
-	insData := envelope.ConvertToInscriptionData()
+func EnvelopToDmtOpr(envelope envelops.Envelope) (*DmtOpr, error) {
+	insData := ConvertToInscriptionData(envelope)
 	dmtOpr := &DmtOpr{}
 	err := json.Unmarshal(insData.Body, dmtOpr)
 	if err != nil {
