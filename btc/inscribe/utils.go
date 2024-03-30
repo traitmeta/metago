@@ -7,9 +7,11 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcutil"
 )
 
 func GetRevealOutValue(revealOutValue int64) int64 {
@@ -171,4 +173,20 @@ func GetServiceFee(inscAmount int64) int64 {
 	}
 
 	return inscAmount * 50
+}
+
+func getServiceFeePkScript(address string, net *chaincfg.Params) (*[]byte, error) {
+	// 解析接收地址
+	addr, err := btcutil.DecodeAddress(address, net)
+	if err != nil {
+		return nil, err
+	}
+
+	// 创建一个支付到该地址的脚本
+	pkScript, err := txscript.PayToAddrScript(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pkScript, nil
 }

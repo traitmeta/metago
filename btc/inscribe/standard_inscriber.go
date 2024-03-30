@@ -311,7 +311,7 @@ func (ins *StandardInscriber) newEmptyRevealTx(index int, destination string, re
 	return tx, nil
 }
 
-// InitEmptyMiddleTx: 构造middleTx: 连接commit tx和（除了第一笔）reveal tx的中间tx： 包含reveal tx1 + commit tx2... + 手续费 + 找零
+// InitEmptyMiddleTx : 构造middleTx: 连接commit tx和（除了第一笔）reveal tx的中间tx： 包含reveal tx1 + commit tx2... + 手续费 + 找零
 func (ins *StandardInscriber) InitEmptyMiddleTx(txs []*InscriptionRawTx, totalRevealPrevOutput int64, revealOutValue, feeRate, inscAmount int64) (totalPrevOutput, serviceFee, minerFee int64, err error) {
 	emptySignature := make([]byte, 64)
 	emptyControlBlockWitness := make([]byte, 33)
@@ -328,7 +328,7 @@ func (ins *StandardInscriber) InitEmptyMiddleTx(txs []*InscriptionRawTx, totalRe
 
 	// 在middle tx的末尾，添加一个给平台手续费操作的uxto输出
 	serviceFee = GetServiceFee(inscAmount)
-	servicePkScript, err := ins.getServiceFeePkScript()
+	servicePkScript, err := getServiceFeePkScript(ins.serviceFeeReceiveAddr, ins.net)
 	txs[0].Raw.AddTxOut(wire.NewTxOut(serviceFee, *servicePkScript))
 	totalPrevOutput += serviceFee
 
@@ -344,20 +344,4 @@ func (ins *StandardInscriber) InitEmptyMiddleTx(txs []*InscriptionRawTx, totalRe
 	}
 
 	return totalPrevOutput, serviceFee, minerFee, nil
-}
-
-func (ins *StandardInscriber) getServiceFeePkScript() (*[]byte, error) {
-	// 解析接收地址
-	addr, err := btcutil.DecodeAddress(ins.serviceFeeReceiveAddr, ins.net)
-	if err != nil {
-		return nil, err
-	}
-
-	// 创建一个支付到该地址的脚本
-	pkScript, err := txscript.PayToAddrScript(addr)
-	if err != nil {
-		return nil, err
-	}
-
-	return &pkScript, nil
 }
