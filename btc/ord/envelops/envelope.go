@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -80,6 +81,22 @@ func (e *Envelope) GetPointer() uint64 {
 	}
 
 	return 0
+}
+
+func (e *Envelope) GetRune() string {
+	if v, ok := e.TypeDataMap[13]; ok {
+		length := len(v)
+		if length > 16 {
+			return ""
+		}
+		var res = make([]byte, length)
+		for i, _ := range v {
+			res[i] = v[length-1-i]
+		}
+		return big.NewInt(0).SetBytes(res).String()
+	}
+
+	return ""
 }
 
 // GetProvenance is parent little-endian OP_PUSH 3 TXID INDEX
