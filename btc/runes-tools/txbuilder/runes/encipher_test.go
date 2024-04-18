@@ -59,7 +59,7 @@ func Test_encipher(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := encipher(tt.args.runesId)
+			got, err := Encipher(tt.args.runesId)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("encipher() error = %v, wantErr %v", err, tt.wantErr)
 				return

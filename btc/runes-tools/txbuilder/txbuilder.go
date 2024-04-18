@@ -23,7 +23,6 @@ const defaultOutputValue int64 = 546
 type MintTxBuilder struct {
 	tx                *wire.MsgTx
 	net               *chaincfg.Params
-	runesCli          *runes.Client
 	privateKey        *btcec.PrivateKey
 	prevOutputFetcher *txscript.MultiPrevOutFetcher
 	req               runes.EtchRequest
