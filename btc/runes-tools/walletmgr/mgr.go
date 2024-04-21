@@ -16,9 +16,27 @@ func InitWalletMgr(cacheDir string, net *chaincfg.Params) (*WalletMgr, error) {
 		return nil, err
 	}
 
+	var wallets []*Wallet
+	wifs, err := cache.ReadAllWalletWiF()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, wif := range wifs {
+		wallet, err := InitWallet(wif, cache, net)
+		if err != nil {
+			return nil, err
+		}
+		wallets = append(wallets, wallet)
+	}
+
 	return &WalletMgr{
 		net:     net,
-		wallets: nil,
+		wallets: wallets,
 		cache:   cache,
 	}, nil
+}
+
+func (wm *WalletMgr) MintsRunes() {
+
 }
