@@ -1,7 +1,11 @@
 package walletmgr
 
 import (
+	"fmt"
+
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/rpcclient"
+	log "github.com/sirupsen/logrus"
 )
 
 type WalletMgr struct {
@@ -37,6 +41,15 @@ func InitWalletMgr(cacheDir string, net *chaincfg.Params) (*WalletMgr, error) {
 	}, nil
 }
 
-func (wm *WalletMgr) MintsRunes() {
+func (wm *WalletMgr) MintsRunes(cli *rpcclient.Client, runeId string, destination string) {
+	for i, wallet := range wm.wallets {
+		err := wallet.MintRunes(cli, runeId, destination)
+		if err != nil {
+			log.Info(fmt.Sprintf("wallet %d mint runes %s to %s failed", i, runeId, destination))
+			continue
+		}
+	}
+}
 
+func (wm *WalletMgr) GetMintProcessing(runeId string, destination string) {
 }

@@ -51,16 +51,16 @@ func InitWallet(wif string, cache *Cache, net *chaincfg.Params) (*Wallet, error)
 	}, nil
 }
 
-func (w *Wallet) MintRunes(cli *rpcclient.Client, runeId string, destination string) {
+func (w *Wallet) MintRunes(cli *rpcclient.Client, runeId string, destination string) error {
 	builder := txbuilder.NewMintTxBuilder(w.privateKey, w.net)
 	prevInfo, err := w.cache.ReadWalletPrevInfo(w.cachePrefix)
 	if err != nil {
-		return
+		return errors.Wrap(err, "ReadWalletPrevInfo")
 	}
 
 	gasFee, err := w.cache.ReadMemPoolGas()
 	if err != nil {
-		return
+		return errors.Wrap(err, "ReadMemPoolGas")
 	}
 
 	req := runes.EtchRequest{
@@ -71,22 +71,24 @@ func (w *Wallet) MintRunes(cli *rpcclient.Client, runeId string, destination str
 
 	tx, err := builder.BuildMintTx(*prevInfo, req)
 	if err != nil {
-		return
+		return errors.Wrap(err, "BuildMintTx")
 	}
 
 	txHash, err := cli.SendRawTransaction(tx, false)
 	if err != nil {
-		return
+		return errors.Wrap(err, "SendRawTransaction")
 	}
 
 	var txBuf bytes.Buffer
 	err = tx.Serialize(&txBuf)
 	if err != nil {
-		return
+		return errors.Wrap(err, "Serialize")
 	}
 
 	err = w.cache.CacheWalletMintTxInfo(w.cachePrefix, txHash.String(), hex.EncodeToString(txBuf.Bytes()))
 	if err != nil {
-		return
+		return errors.Wrap(err, "CacheWalletMintTxInfo")
 	}
+
+	return nil
 }
