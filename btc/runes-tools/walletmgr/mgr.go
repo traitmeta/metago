@@ -3,15 +3,41 @@ package walletmgr
 import (
 	"fmt"
 
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/btcsuite/btcd/txscript"
 	log "github.com/sirupsen/logrus"
 )
+
+const walletLen = 10
 
 type WalletMgr struct {
 	net     *chaincfg.Params
 	wallets []*Wallet
 	cache   *Cache
+}
+
+func InitAndCacheWalletWif(cacheDir string, net *chaincfg.Params) error {
+	cache, err := InitCache(cacheDir)
+	if err != nil {
+		return err
+	}
+
+	var wallets []string
+	for i := 0; i < walletLen; i++ {
+		privateKey, err := btcec.NewPrivateKey()
+		if err != nil {
+			return err
+		}
+
+		privateKeyWIF, err := btcutil.NewWIF(txscript.TweakTaprootPrivKey(*privateKey, []byte{}), net, true)
+
+		wallets = append(wallets, privateKeyWIF.String())
+	}
+
+	return cache.WriteAllWalletWiF(wallets)
 }
 
 func InitWalletMgr(cacheDir string, net *chaincfg.Params) (*WalletMgr, error) {

@@ -29,6 +29,20 @@ func InitCache(cacheDir string) (*Cache, error) {
 	}, nil
 }
 
+func (c *Cache) WriteAllWalletWiF(walletWifs []string) error {
+	bytes, err := json.Marshal(walletWifs)
+	if err != nil {
+		return errors.Wrap(err, "failed on unmarshal protocal data")
+	}
+
+	err = c.cache.Put([]byte(walletWIFKey), bytes, nil)
+	if err != nil {
+		return ErrNotFindWalletWifInCache
+	}
+
+	return nil
+}
+
 func (c *Cache) ReadAllWalletWiF() ([]string, error) {
 	walletWifs, err := c.cache.Get([]byte(walletWIFKey), nil)
 	if err != nil {
