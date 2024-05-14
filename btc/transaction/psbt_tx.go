@@ -460,6 +460,9 @@ func ExtractTxFromSignedPSBT(psbtHex string) (string, error) {
 	}
 
 	tx, err := psbt.Extract(p)
+	if err != nil {
+		return "", err
+	}
 
 	return GetTxHex(tx)
 }
@@ -490,7 +493,7 @@ func SignRawPSBTTransaction(psbtHex string, privKey string) (string, error) {
 	for i, pIn := range p.Inputs {
 		err = signPSBTPacket(updater, privKey, i, p, prevOutputFetcher, pIn.SighashType)
 		if err != nil {
-			//return "", err
+			return "", err
 		}
 	}
 
@@ -818,6 +821,9 @@ func GenerateBatchBuyingTxPsbt(ins []*TxInput, outs []*TxOutput, sellerPSBTList 
 
 func CalcFeeForBatchBuy(ins []*TxInput, outs []*TxOutput, sellerPSBTList []string, feeRate int64, network *chaincfg.Params) (int64, error) {
 	txHex, err := GenerateBatchBuyingTx(ins, outs, sellerPSBTList, network)
+	if err != nil {
+		return 0, err
+	}
 
 	tx := wire.NewMsgTx(2)
 	txBytes, err := hex.DecodeString(txHex)
@@ -909,9 +915,9 @@ func GenerateMPCUnsignedListingPSBT(in *TxInput, out *TxOutput, network *chaincf
 	}
 	witnessUtxo := wire.NewTxOut(in.Amount, prevPkScript)
 	prevOuts := map[wire.OutPoint]*wire.TxOut{
-		wire.OutPoint{Index: 0}: dummyWitnessUtxo,
-		wire.OutPoint{Index: 1}: dummyWitnessUtxo,
-		*prevOut:                witnessUtxo,
+		{Index: 0}: dummyWitnessUtxo,
+		{Index: 1}: dummyWitnessUtxo,
+		*prevOut:   witnessUtxo,
 	}
 	prevOutputFetcher := txscript.NewMultiPrevOutFetcher(prevOuts)
 
@@ -1140,6 +1146,10 @@ func calcInputSigHash(updater *psbt.Updater, i int, in *TxInput, prevOutFetcher 
 	tx := updater.Upsbt.UnsignedTx
 	txSigHashes := txscript.NewTxSigHashes(updater.Upsbt.UnsignedTx, prevOutFetcher)
 	pubKeyBytes, err := hex.DecodeString(in.PublicKey)
+	if err != nil {
+		return "", err
+	}
+
 	var sigHash []byte
 	if txscript.IsPayToTaproot(prevPkScript) {
 		if hashType == txscript.SigHashAll {
@@ -1314,8 +1324,9 @@ func GenerateMPCUnsignedPSBT(psbtStr string, pubKeyHex string) (*GenerateMPCPSbt
 			hash, err := GetRandomHash()
 			if err != nil {
 				sigHash = pubKeyHex
+			} else {
+				sigHash = hash
 			}
-			sigHash = hash
 		}
 		sigHashList = append(sigHashList, sigHash)
 	}
