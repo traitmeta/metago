@@ -4,8 +4,6 @@ import (
 	"encoding/hex"
 	"reflect"
 	"testing"
-
-	"github.com/traitmeta/metago/btc/ord"
 )
 
 func TestFromTapScript(t *testing.T) {
@@ -24,7 +22,7 @@ func TestFromTapScript(t *testing.T) {
 			name: "test tap pointer",
 			args: args{
 				// from txID 831b8d6637f1c7cf82859203b7a644104e8b40ce026bca848b383f0e3c820fdc
-				tapScript: ord.witnessList[0],
+				tapScript: witnessList[0],
 				input:     0,
 			},
 			want:    nil,
@@ -34,7 +32,7 @@ func TestFromTapScript(t *testing.T) {
 		{
 			name: "test tap pointer",
 			args: args{
-				tapScript: ord.witnessList[1],
+				tapScript: witnessList[1],
 				input:     0,
 			},
 			want: []Envelope{
@@ -62,7 +60,7 @@ func TestFromTapScript(t *testing.T) {
 			// txid : 84defb5e7db11f047b4bc58685b65654980be4a55e254a510048a71e0e43e532i0
 			name: "test tap Provenance",
 			args: args{
-				tapScript: ord.witnessList[2],
+				tapScript: witnessList[2],
 				input:     0,
 			},
 			want:    []Envelope{},
@@ -110,7 +108,7 @@ func TestEnvelope_GetProvenance(t *testing.T) {
 			// txid : 84defb5e7db11f047b4bc58685b65654980be4a55e254a510048a71e0e43e532i0
 			name: "test tap Provenance",
 			args: args{
-				tapScript: ord.witnessList[2],
+				tapScript: witnessList[2],
 				input:     0,
 			},
 			want:    "593015b9a76a11554f0a05c3b77a4723c6baaefb8bdd4175712a7320714b8ea8i0",
