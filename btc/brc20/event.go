@@ -14,8 +14,8 @@ var (
 	blockStartMaxEventID                   int
 	brc20EventsInsertCache                 []Event
 	brc20TickersInsertCache                []Ticker
-	brc20TickersRemainingSupplyUpdateCache = make(map[string]int)
-	brc20TickersBurnedSupplyUpdateCache    = make(map[string]int)
+	brc20TickersRemainingSupplyUpdateCache = make(map[string]decimal.Decimal)
+	brc20TickersBurnedSupplyUpdateCache    = make(map[string]decimal.Decimal)
 	brc20HistoricBalancesInsertCache       []WalletBalance
 	ticks                                  = make(map[string][]interface{})
 	eventTypes                             = map[string]int{"deploy-inscribe": 1, "mint-inscribe": 2, "transfer-inscribe": 3, "transfer-transfer": 4}
@@ -80,13 +80,13 @@ func deployInscribe(blockHeight int, inscriptionID, deployerPkScript, deployerWa
 }
 
 // mintInscribe handles mint-inscribe events
-func mintInscribe(blockHeight int, inscriptionID, mintedPkScript, mintedWallet, tick, originalTick string, amount int, parentID string) {
+func mintInscribe(blockHeight int64, inscriptionID, mintedPkScript, mintedWallet, tick, originalTick string, amount decimal.Decimal, parentID string) error {
 	event := map[string]string{
 		"minted_pkScript": mintedPkScript,
 		"minted_wallet":   mintedWallet,
 		"tick":            tick,
 		"original_tick":   originalTick,
-		"amount":          fmt.Sprintf("%d", amount),
+		"amount":          amount.String(),
 		"parent_id":       parentID,
 	}
 	eventStr, _ := json.Marshal(event)
@@ -96,12 +96,17 @@ func mintInscribe(blockHeight int, inscriptionID, mintedPkScript, mintedWallet, 
 	brc20EventsInsertCache = append(brc20EventsInsertCache, Event{eventID, eventTypes["mint-inscribe"], blockHeight, inscriptionID, string(eventStr)})
 	brc20TickersRemainingSupplyUpdateCache[tick] += amount
 
-	lastBalance := getLastBalance(mintedPkScript, tick)
+	lastBalance, err := getLastBalance(mintedPkScript, tick)
+	if err != nil {
+		return err
+	}
+
 	lastBalance.OverallBalance += amount
 	lastBalance.AvailableBalance += amount
 	brc20HistoricBalancesInsertCache = append(brc20HistoricBalancesInsertCache, WalletBalance{mintedPkScript, mintedWallet, tick, lastBalance.OverallBalance, lastBalance.AvailableBalance, blockHeight, eventID})
 
 	ticks[tick][0] = ticks[tick][0].(int) - amount
+	return nil
 }
 
 // transferInscribe handles transfer-inscribe events
@@ -224,13 +229,4 @@ func getEventStr(event map[string]string, eventType, inscriptionID string) strin
 func getSha256Hash(data string) string {
 	// Implement this function to return SHA256 hash of the input data
 	return ""
-}
-
-func saveTransferInscribeEvent(inscriptionID string, event map[string]string) {
-	// Implement this function to save transfer inscribe event
-}
-
-func getTransferInscribeEvent(inscriptionID string) map[string]string {
-	// Implement this function to get transfer inscribe event by inscriptionID
-	return make(map[string]string)
 }

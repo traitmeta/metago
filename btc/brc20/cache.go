@@ -10,35 +10,32 @@ import (
 
 // Global variables
 var (
-	transferInscribeEventCache = make(map[string]string)
+	transferInscribeEventCache = make(map[string]Brc20Events)
 	balanceCache               = make(map[string]WalletBalance)
 	transferValidityCache      = make(map[string]int)
 	cachedTickers              = make(map[string]Brc20Tickers)
-	eventTypes                 = map[string]int{
-		"transfer-inscribe": 1,
-		"transfer-transfer": 2,
-	}
 )
 
 // getTransferInscribeEvent fetches the transfer inscribe event for a given inscription ID
-func getTransferInscribeEvent(inscriptionID string) (string, error) {
+func getTransferInscribeEvent(inscriptionID string) (*Brc20Events, error) {
 	if event, ok := transferInscribeEventCache[inscriptionID]; ok {
 		delete(transferInscribeEventCache, inscriptionID)
-		return event, nil
+		return &event, nil
 	}
 
-	query := `SELECT event FROM brc20_events WHERE event_type = $1 AND inscription_id = $2;`
-	row := db.QueryRow(query, eventTypes["transfer-inscribe"], inscriptionID)
-	var event string
-	if err := row.Scan(&event); err != nil {
-		return "", err
+	var event Brc20Events
+	if err := db.DBEngine.DB.Model(&Brc20Events{}).
+		Where("event_type = ? AND inscription_id = ?", eventTypes["transfer-inscribe"], inscriptionID).
+		Take(&event).Error; err != nil {
+		return nil, err
 	}
 
-	return event, nil
+	return &event, nil
 }
 
+// TODO save to DB
 // saveTransferInscribeEvent saves the transfer inscribe event in the cache
-func saveTransferInscribeEvent(inscriptionID, event string) {
+func saveTransferInscribeEvent(inscriptionID string, event Brc20Events) {
 	transferInscribeEventCache[inscriptionID] = event
 }
 
@@ -120,7 +117,7 @@ func setTransferAsValid(inscriptionID string) {
 // TODO use levelDB to cache all ticker info
 func resetCaches() {
 	balanceCache = make(map[string]WalletBalance)
-	transferInscribeEventCache = make(map[string]string)
+	transferInscribeEventCache = make(map[string]Brc20Events)
 	transferValidityCache = make(map[string]int)
 	startTime := time.Now()
 
