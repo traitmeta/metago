@@ -1,6 +1,10 @@
 package brc20
 
-import "database/sql"
+import (
+	"database/sql"
+
+	"github.com/shopspring/decimal"
+)
 
 type Brc20BlockHashes struct {
 	Id          string `gorm:"column:id;NOT NULL"`
@@ -13,14 +17,14 @@ func (b *Brc20BlockHashes) TableName() string {
 }
 
 type Brc20HistoricBalances struct {
-	Id               string         `gorm:"column:id;NOT NULL"`
-	Pkscript         string         `gorm:"column:pkscript;NOT NULL"`
-	Wallet           sql.NullString `gorm:"column:wallet"`
-	Tick             string         `gorm:"column:tick;NOT NULL"`
-	OverallBalance   string         `gorm:"column:overall_balance;NOT NULL"`
-	AvailableBalance string         `gorm:"column:available_balance;NOT NULL"`
-	BlockHeight      string         `gorm:"column:block_height;NOT NULL"`
-	EventId          string         `gorm:"column:event_id;NOT NULL"`
+	Id               string          `gorm:"column:id;NOT NULL"`
+	Pkscript         string          `gorm:"column:pkscript;NOT NULL"`
+	Wallet           sql.NullString  `gorm:"column:wallet"`
+	Tick             string          `gorm:"column:tick;NOT NULL"`
+	OverallBalance   decimal.Decimal `gorm:"column:overall_balance;NOT NULL"`
+	AvailableBalance decimal.Decimal `gorm:"column:available_balance;NOT NULL"`
+	BlockHeight      string          `gorm:"column:block_height;NOT NULL"`
+	EventId          string          `gorm:"column:event_id;NOT NULL"`
 }
 
 func (b *Brc20HistoricBalances) TableName() string {

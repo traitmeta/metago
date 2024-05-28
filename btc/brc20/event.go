@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+
+	"github.com/shopspring/decimal"
 )
 
 // Global variables
@@ -48,10 +50,10 @@ type WalletBalance struct {
 	PkScript         string
 	Wallet           string
 	Tick             string
-	OverallBalance   int
-	AvailableBalance int
-	BlockHeight      int
-	EventID          int
+	OverallBalance   decimal.Decimal
+	AvailableBalance decimal.Decimal
+	BlockHeight      int64
+	EventID          int64
 }
 
 // deployInscribe handles deploy-inscribe events
@@ -224,15 +226,6 @@ func getSha256Hash(data string) string {
 	return ""
 }
 
-func getLastBalance(pkScript, tick string) WalletBalance {
-	// Implement this function to retrieve the last balance for the given pkScript and tick
-	return WalletBalance{}
-}
-
-func setTransferAsValid(inscriptionID string) {
-	// Implement this function to mark a transfer as valid
-}
-
 func saveTransferInscribeEvent(inscriptionID string, event map[string]string) {
 	// Implement this function to save transfer inscribe event
 }
@@ -240,8 +233,4 @@ func saveTransferInscribeEvent(inscriptionID string, event map[string]string) {
 func getTransferInscribeEvent(inscriptionID string) map[string]string {
 	// Implement this function to get transfer inscribe event by inscriptionID
 	return make(map[string]string)
-}
-
-func setTransferAsUsed(inscriptionID string) {
-	// Implement this function to mark a transfer as used
 }
