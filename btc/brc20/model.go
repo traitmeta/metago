@@ -63,7 +63,7 @@ func (b *Brc20Tickers) TableName() string {
 
 type Brc20CumulativeEventHashes struct {
 	Id                  string `gorm:"column:id;NOT NULL"`
-	BlockHeight         string `gorm:"column:block_height;NOT NULL"`
+	BlockHeight         int64  `gorm:"column:block_height;NOT NULL"`
 	BlockEventHash      string `gorm:"column:block_event_hash;NOT NULL"`
 	CumulativeEventHash string `gorm:"column:cumulative_event_hash;NOT NULL"`
 }

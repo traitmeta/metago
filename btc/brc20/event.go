@@ -1,12 +1,12 @@
 package brc20
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/shopspring/decimal"
+	"github.com/traitmeta/gotos/lib/db"
+	"gorm.io/gorm"
 )
 
 // Global variables
@@ -171,8 +171,12 @@ func transferTransferNormal(blockHeight int, inscriptionID, spentPkScript, spent
 }
 
 // transferTransferSpendToFee handles transfer-transfer events where the spent amount is converted to a fee
-func transferTransferSpendToFee(blockHeight int, inscriptionID, tick, originalTick string, amount int, usingTxID string) {
-	inscribeEvent := getTransferInscribeEvent(inscriptionID)
+func transferTransferSpendToFee(blockHeight int, inscriptionID, tick, originalTick string, amount decimal.Decimal, usingTxID string) error {
+	inscribeEvent, err := getTransferInscribeEvent(inscriptionID)
+	if err != nil {
+		return err
+	}
+
 	sourcePkScript := inscribeEvent["source_pkScript"]
 	sourceWallet := inscribeEvent["source_wallet"]
 	event := map[string]string{
@@ -192,32 +196,39 @@ func transferTransferSpendToFee(blockHeight int, inscriptionID, tick, originalTi
 	brc20EventsInsertCache = append(brc20EventsInsertCache, Event{eventID, eventTypes["transfer-transfer"], blockHeight, inscriptionID, string(eventStr)})
 	setTransferAsUsed(inscriptionID)
 
-	lastBalance := getLastBalance(sourcePkScript, tick)
-	lastBalance.AvailableBalance += amount
+	lastBalance, err := getLastBalance(sourcePkScript, tick)
+	if err != nil {
+		return err
+	}
+
+	lastBalance.AvailableBalance = lastBalance.AvailableBalance.Add(amount)
 	brc20HistoricBalancesInsertCache = append(brc20HistoricBalancesInsertCache, WalletBalance{sourcePkScript, sourceWallet, tick, lastBalance.OverallBalance, lastBalance.AvailableBalance, blockHeight, eventID})
+	return nil
 }
 
 // updateEventHashes updates the event hashes for the block
-func updateEventHashes(blockHeight int) {
+func updateEventHashes(blockHeight int64) error {
 	if len(blockEventsStr) > 0 && blockEventsStr[len(blockEventsStr)-1] == byte(EVENT_SEPARATOR[0]) {
 		blockEventsStr = blockEventsStr[:len(blockEventsStr)-1] // remove last separator
 	}
 	blockEventHash := getSha256Hash(blockEventsStr)
 
-	var cumulativeEventHash string
-	row := db.QueryRow("SELECT cumulative_event_hash FROM brc20_cumulative_event_hashes WHERE block_height = $1", blockHeight-1)
-	err := row.Scan(&cumulativeEventHash)
-	if err == sql.ErrNoRows {
-		cumulativeEventHash = blockEventHash
-	} else if err != nil {
-		log.Fatal(err)
-	} else {
-		cumulativeEventHash = getSha256Hash(cumulativeEventHash + blockEventHash)
+	var eventHash Brc20CumulativeEventHashes
+	if err := db.DBEngine.DB.Model(&Brc20CumulativeEventHashes{}).
+		Where("block_height = ?", blockHeight-1).
+		Scan(&eventHash).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			eventHash.CumulativeEventHash = blockEventHash
+		} else {
+			return err
+		}
 	}
-	_, err = db.Exec("INSERT INTO brc20_cumulative_event_hashes (block_height, block_event_hash, cumulative_event_hash) VALUES ($1, $2, $3)", blockHeight, blockEventHash, cumulativeEventHash)
-	if err != nil {
-		log.Fatal(err)
-	}
+
+	eventHash.CumulativeEventHash = getSha256Hash(eventHash.CumulativeEventHash + blockEventHash)
+
+	eventHash.BlockHeight = blockHeight
+	eventHash.BlockEventHash = blockEventHash
+	return db.DBEngine.DB.Model(&Brc20CumulativeEventHashes{}).Create(&eventHash).Error
 }
 
 // Dummy functions for missing implementations
