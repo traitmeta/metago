@@ -25,9 +25,9 @@ var (
 
 // Event structure to hold event details
 type Event struct {
-	ID            int
+	ID            int64
 	EventType     int
-	BlockHeight   int
+	BlockHeight   int64
 	InscriptionID string
 	Event         string
 }
@@ -36,11 +36,11 @@ type Event struct {
 type Ticker struct {
 	Tick                string
 	OriginalTick        string
-	MaxSupply           int
+	MaxSupply           decimal.Decimal
 	Decimals            int
-	LimitPerMint        int
-	RemainingSupply     int
-	BlockHeight         int
+	LimitPerMint        decimal.Decimal
+	RemainingSupply     decimal.Decimal
+	BlockHeight         int64
 	IsSelfMint          bool
 	DeployInscriptionID string
 }
@@ -94,15 +94,15 @@ func mintInscribe(blockHeight int64, inscriptionID, mintedPkScript, mintedWallet
 
 	eventID := blockStartMaxEventID + len(brc20EventsInsertCache) + 1
 	brc20EventsInsertCache = append(brc20EventsInsertCache, Event{eventID, eventTypes["mint-inscribe"], blockHeight, inscriptionID, string(eventStr)})
-	brc20TickersRemainingSupplyUpdateCache[tick] += amount
+	brc20TickersRemainingSupplyUpdateCache[tick] = brc20TickersRemainingSupplyUpdateCache[tick].Add(amount)
 
 	lastBalance, err := getLastBalance(mintedPkScript, tick)
 	if err != nil {
 		return err
 	}
 
-	lastBalance.OverallBalance += amount
-	lastBalance.AvailableBalance += amount
+	lastBalance.OverallBalance = lastBalance.OverallBalance.Add(amount)
+	lastBalance.AvailableBalance = lastBalance.AvailableBalance.Add(amount)
 	brc20HistoricBalancesInsertCache = append(brc20HistoricBalancesInsertCache, WalletBalance{mintedPkScript, mintedWallet, tick, lastBalance.OverallBalance, lastBalance.AvailableBalance, blockHeight, eventID})
 
 	ticks[tick][0] = ticks[tick][0].(int) - amount
