@@ -21,23 +21,6 @@ import (
 	"github.com/traitmeta/metago/btc/runes-tools/txbuilder/runes"
 )
 
-type InscriptionData struct {
-	ContentType string
-	Body        []byte
-	Destination string
-
-	// extra data
-	MetaProtocol string
-	Commitment   []byte
-	Runestone    runes.RuneStone
-}
-
-type InscriptionRequest struct {
-	FeeRate        int64 // note: fee rate in bytes
-	DataList       []InscriptionData
-	RevealOutValue int64
-}
-
 type CtxTxData struct {
 	//commit tx imfo
 	PrevCommitTxHash string // 相应的commit tx的哈希
@@ -101,15 +84,14 @@ type PayInfo struct {
 	MinerFee       int64
 }
 
-func (tool *RunesMinter) GetPayAddrAndFee(request *InscriptionRequest) (*PayInfo, error) {
+func (tool *RunesMinter) GetPayAddrAndFee(req MintReq) (*PayInfo, error) {
 	var payInfo = &PayInfo{}
-	tool.txCtxDataList = make([]*inscriptionTxCtxData, len(request.DataList)) // not1e: 初始化，铭文列表
-	tool.revealTxPrevOutputFetcher = txscript.NewMultiPrevOutFetcher(nil)     // note: 初始化，reveal tx的输入
-	tool.middleTxPrevOutputFetcher = txscript.NewMultiPrevOutFetcher(nil)     // note: 初始化，middle tx的输入
-	tool.txCtxDataList = make([]*inscriptionTxCtxData, len(request.DataList)) // note: 初始化，铭文列表
-	destinations := make([]string, len(request.DataList))                     // note: 初始化，铭文的接收地址
+	tool.txCtxDataList = make([]*inscriptionTxCtxData, req.Count)         // not1e: 初始化，铭文列表
+	tool.revealTxPrevOutputFetcher = txscript.NewMultiPrevOutFetcher(nil) // note: 初始化，reveal tx的输入
+	tool.middleTxPrevOutputFetcher = txscript.NewMultiPrevOutFetcher(nil) // note: 初始化，middle tx的输入
+	destinations := make([]string, req.Count)                             // note: 初始化，铭文的接收地址
 
-	for i := 0; i < len(request.DataList); i++ {
+	for i := 0; i < req.Count; i++ {
 		privateKey, err := btcec.NewPrivateKey() // note: 创建一个密钥对，用来构建reveal tx
 		if err != nil {
 			return nil, errors.Wrap(err, "create private key error")
@@ -124,15 +106,15 @@ func (tool *RunesMinter) GetPayAddrAndFee(request *InscriptionRequest) (*PayInfo
 			return nil, errors.Wrap(err, "create inscription tx ctx data error")
 		}
 		tool.txCtxDataList[i] = txCtxData
-		destinations[i] = request.DataList[i].Destination
+		destinations[i] = req.Receiver
 	}
 
-	err := tool.buildEmptyRevealTx(destinations, request.FeeRate, request.DataList)
+	err := tool.buildEmptyRevealTx(destinations, req.FeeRate, req.RuneId)
 	if err != nil {
 		return nil, errors.Wrap(err, "build empty reveal tx error")
 	}
 
-	payInfo.InscriptionFee, payInfo.MinerFee, err = tool.buildEmptyMiddleTx(destinations[0], request.FeeRate, int64(len(request.DataList)), request.DataList[0].Runestone)
+	payInfo.InscriptionFee, payInfo.MinerFee, err = tool.buildEmptyMiddleTx(destinations[0], req)
 	if err != nil {
 		return nil, errors.Wrap(err, "build empty middle tx error")
 	}
@@ -141,14 +123,12 @@ func (tool *RunesMinter) GetPayAddrAndFee(request *InscriptionRequest) (*PayInfo
 	return payInfo, nil
 }
 
-func (tool *RunesMinter) Inscribe(commitTxHash string, actualMiddlePrevOutputFee int64, payAddrPK string, request *InscriptionRequest) (ctxTxData *CtxTxData, err error) {
-	tool.txCtxDataList = make([]*inscriptionTxCtxData, len(request.DataList)) // note: 初始化，铭文列表
-	tool.revealTxPrevOutputFetcher = txscript.NewMultiPrevOutFetcher(nil)     // note: 初始化，reveal tx的输入
-	tool.middleTxPrevOutputFetcher = txscript.NewMultiPrevOutFetcher(nil)     // note: 初始化，middle tx的输入
-
-	tool.txCtxDataList = make([]*inscriptionTxCtxData, len(request.DataList)) // note: 初始化，铭文列表
-	destinations := make([]string, len(request.DataList))                     // note: 初始化，铭文的接收地址
-	for i := 0; i < len(request.DataList); i++ {
+func (tool *RunesMinter) Inscribe(commitTxHash string, actualMiddlePrevOutputFee int64, payAddrPK string, req MintReq) (ctxTxData *CtxTxData, err error) {
+	tool.revealTxPrevOutputFetcher = txscript.NewMultiPrevOutFetcher(nil) // note: 初始化，reveal tx的输入
+	tool.middleTxPrevOutputFetcher = txscript.NewMultiPrevOutFetcher(nil) // note: 初始化，middle tx的输入
+	tool.txCtxDataList = make([]*inscriptionTxCtxData, req.Count)         // note: 初始化，铭文列表
+	destinations := make([]string, req.Count)                             // note: 初始化，铭文的接收地址
+	for i := 0; i < req.Count; i++ {
 		var privateKey *btcec.PrivateKey
 		var err error
 		if i == 0 { // warn: 构建第一个铭文的私钥，用之前生成的
@@ -170,15 +150,15 @@ func (tool *RunesMinter) Inscribe(commitTxHash string, actualMiddlePrevOutputFee
 			return nil, errors.Wrap(err, "create inscription tx ctx data error")
 		}
 		tool.txCtxDataList[i] = txCtxData
-		destinations[i] = request.DataList[i].Destination
+		destinations[i] = req.Receiver
 	}
 
-	err = tool.buildEmptyRevealTx(destinations, request.FeeRate, request.DataList)
+	err = tool.buildEmptyRevealTx(destinations, req.FeeRate, req.RuneId)
 	if err != nil {
 		return nil, errors.Wrap(err, "build empty reveal tx error")
 	}
 
-	totalMiddlePrevOutput, _, err := tool.buildEmptyMiddleTx(destinations[0], request.FeeRate, int64(len(request.DataList)), request.DataList[0].Runestone)
+	totalMiddlePrevOutput, _, err := tool.buildEmptyMiddleTx(destinations[0], req)
 	if err != nil {
 		return nil, errors.Wrap(err, "build empty middle tx error")
 	}
@@ -299,15 +279,15 @@ func createRuneMintTxCtxData(net *chaincfg.Params, privateKey *btcec.PrivateKey)
 	}, nil
 }
 
-func (tool *RunesMinter) buildEmptyRevealTx(destination []string, feeRate int64, insData []InscriptionData) (err error) {
+func (tool *RunesMinter) buildEmptyRevealTx(destination []string, feeRate int64, runeId string) (err error) {
 	var revealTx []*wire.MsgTx
 	total := len(tool.txCtxDataList)
-	addTxInTxOutIntoRevealTx := func(tx *wire.MsgTx, index int, runestone runes.RuneStone) error {
+	addTxInTxOutIntoRevealTx := func(tx *wire.MsgTx, index int, runeId string) error {
 		in := wire.NewTxIn(&wire.OutPoint{Index: uint32(index)}, nil, nil)
 		in.Sequence = defaultSequenceNum
 		tx.AddTxIn(in)
 
-		output, err := runes.CreateRuneStoneOutput(tool.runesCli, runestone)
+		output, err := runes.CreateMintRuneStoneOutput(runeId)
 		if err != nil {
 			return errors.Wrap(err, "build runestone script fail")
 		}
@@ -317,6 +297,7 @@ func (tool *RunesMinter) buildEmptyRevealTx(destination []string, feeRate int64,
 		if err != nil {
 			return errors.Wrap(err, "decode address error")
 		}
+
 		scriptPubKey, err := txscript.PayToAddrScript(receiver)
 		if err != nil {
 			return errors.Wrap(err, "pay to address script error")
@@ -329,8 +310,8 @@ func (tool *RunesMinter) buildEmptyRevealTx(destination []string, feeRate int64,
 	revealTx = make([]*wire.MsgTx, total-1) // note: 初始化，创建多个reveal tx
 
 	for i := 1; i < total; i++ { // modified: 循环除了第一个铭文数据，构造除了第一个reveal tx 的信息
-		tx := wire.NewMsgTx(int32(2))                                // note: 创建一个新的reveal tx
-		err := addTxInTxOutIntoRevealTx(tx, i, insData[i].Runestone) // note: 往每个tx添加“空的交易输入”和输出
+		tx := wire.NewMsgTx(int32(2))
+		err := addTxInTxOutIntoRevealTx(tx, i, runeId)
 		if err != nil {
 			return errors.Wrap(err, "add tx in tx out into reveal tx error")
 		}
@@ -355,9 +336,8 @@ func (tool *RunesMinter) buildEmptyRevealTx(destination []string, feeRate int64,
 }
 
 // note: include reveal tx1 + commit tx2... + 手续费 + 找零
-func (tool *RunesMinter) buildEmptyMiddleTx(firstDestination string, feeRate, inscAmount int64, runestone runes.RuneStone) (totalPrevOutput, minerFee int64, err error) {
+func (tool *RunesMinter) buildEmptyMiddleTx(firstDestination string, req MintReq) (totalPrevOutput, minerFee int64, err error) {
 	tx := wire.NewMsgTx(int32(2))
-
 	addTxInTxOutOfRevealTx1IntoMiddleTx := func(tx *wire.MsgTx, index int) error {
 		in := wire.NewTxIn(&wire.OutPoint{Index: uint32(index)}, nil, nil)
 		in.Sequence = defaultSequenceNum
@@ -387,7 +367,7 @@ func (tool *RunesMinter) buildEmptyMiddleTx(firstDestination string, feeRate, in
 	prevOutput := defaultRevealOutValue
 	{
 		emptySignature := make([]byte, 64)
-		witnessFee := (int64(wire.TxWitness{emptySignature}.SerializeSize()+2+3) / 4) * feeRate
+		witnessFee := (int64(wire.TxWitness{emptySignature}.SerializeSize()+2+3) / 4) * req.FeeRate
 		prevOutput += witnessFee
 		minerFee += witnessFee
 	}
@@ -402,13 +382,13 @@ func (tool *RunesMinter) buildEmptyMiddleTx(firstDestination string, feeRate, in
 		minerFee += int64(tool.txCtxDataList[i].revealTxPrevOutput.Value) - defaultRevealOutValue
 	}
 
-	output, err := runes.CreateRuneStoneOutput(tool.runesCli, runestone)
+	output, err := runes.CreateMintRuneStoneOutput(req.RuneId)
 	if err != nil {
 		return 0, 0, errors.Wrap(err, "build runestone script fail")
 	}
 
 	tx.AddTxOut(output)
-	txSizeFee := int64(tx.SerializeSize()) * feeRate
+	txSizeFee := int64(tx.SerializeSize()) * req.FeeRate
 	minerFee += txSizeFee
 	totalPrevOutput += txSizeFee
 
