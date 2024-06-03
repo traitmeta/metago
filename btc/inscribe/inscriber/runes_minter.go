@@ -57,7 +57,6 @@ type inscriptionTxCtxData struct {
 type RunesMinter struct {
 	net                       *chaincfg.Params
 	client                    BTCBaseClient
-	runesCli                  *runes.Client
 	txCtxDataList             []*inscriptionTxCtxData
 	revealTxPrevOutputFetcher *txscript.MultiPrevOutFetcher // note: 用于获取reveal tx的输入
 	revealTx                  []*wire.MsgTx                 // note: reveal tx
@@ -70,7 +69,6 @@ func NewRunesMintInscribeTool(net *chaincfg.Params, btcClient BTCBaseClient, run
 	tool := &RunesMinter{
 		net:                       net,
 		client:                    btcClient,
-		runesCli:                  runesCli,
 		revealTxPrevOutputFetcher: txscript.NewMultiPrevOutFetcher(nil),
 		middleTxPrevOutputFetcher: txscript.NewMultiPrevOutFetcher(nil),
 	}
