@@ -1,6 +1,7 @@
 package inscriber
 
 import (
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
@@ -19,13 +20,22 @@ type MintReq struct {
 	Count    int    `json:"count"` // number of mint times
 }
 
+// NOTE : len(middleTx) + len(RevealTxs) = MintReq.Count
 type MintTxs struct {
-	PayTxHash string        `json:"pay_tx_hash"` // user who pay for mint address's transaction hash
-	MiddleTx  *wire.MsgTx   `json:"middle_tx"`   // which include one mint runes and other UTXO for reveals txs input
-	RevealTxs []*wire.MsgTx `json:"reveal_txs"`  // all txs which have mint runes
+	PayTxHash string    `json:"pay_tx_hash"` // user who pay for mint address's transaction hash
+	MiddleTx  *WrapTx   `json:"middle_tx"`   // which include one mint runes and other UTXO for reveals txs input
+	RevealTxs []*WrapTx `json:"reveal_txs"`  // all txs which have mint runes
 }
 
 type WrapTx struct {
+	PrevOutput          *wire.TxOut                   `json:"prev_output"`
 	TxPrevOutputFetcher *txscript.MultiPrevOutFetcher `json:"tx_prev_output_fetcher"`
 	WireTx              *wire.MsgTx                   `json:"wire_tx"`
+}
+
+type PrivateKeyAndScriptInfo struct {
+	PrivateKey      *btcec.PrivateKey `json:"private_key"`
+	Address         btcutil.Address   `json:"address"`
+	PkScript        []byte            `json:"pk_script"`
+	RecoveryPKofWIF string            `json:"recovery_pk_of_wif"`
 }
