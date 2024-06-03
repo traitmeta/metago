@@ -108,7 +108,7 @@ func NewRunesMintInscribeTool(net *chaincfg.Params, btcClient BTCBaseClient, run
 	return tool, nil
 }
 
-func (tool *RunesMinter) GetPayAddrAndFee(request *InscriptionRequest) (payAddr, payAddrPK string, inscFee, serviceFee, minerFee int64, err error) {
+func (tool *RunesMinter) GetPayAddrAndFee(request *InscriptionRequest) (payAddr, payAddrPK string, inscFee, minerFee int64, err error) {
 	tool.txCtxDataList = make([]*inscriptionTxCtxData, len(request.DataList)) // not1e: 初始化，铭文列表
 	tool.revealTxPrevOutputFetcher = txscript.NewMultiPrevOutFetcher(nil)     // note: 初始化，reveal tx的输入
 	tool.middleTxPrevOutputFetcher = txscript.NewMultiPrevOutFetcher(nil)     // note: 初始化，middle tx的输入
@@ -120,7 +120,7 @@ func (tool *RunesMinter) GetPayAddrAndFee(request *InscriptionRequest) (payAddr,
 	for i := 0; i < len(request.DataList); i++ {
 		privateKey, err := btcec.NewPrivateKey() // note: 创建一个密钥对，用来构建reveal tx
 		if err != nil {
-			return "", "", 0, 0, 0, errors.Wrap(err, "create private key error")
+			return "", "", 0, 0, errors.Wrap(err, "create private key error")
 		}
 		if i == 0 { // warn: 保存构建第一个铭文的私钥
 			privKeyBytes := privateKey.Serialize()                      // 将私钥转换为字节数组
@@ -129,22 +129,22 @@ func (tool *RunesMinter) GetPayAddrAndFee(request *InscriptionRequest) (payAddr,
 		txCtxData, err := createRuneMintTxCtxData(tool.net, request.DataList[i], privateKey) // note: 创建commit交易及包含铭文信息的Taproot脚本信息
 
 		if err != nil {
-			return "", "", 0, 0, 0, errors.Wrap(err, "create inscription tx ctx data error")
+			return "", "", 0, 0, errors.Wrap(err, "create inscription tx ctx data error")
 		}
 		tool.txCtxDataList[i] = txCtxData
 		destinations[i] = request.DataList[i].Destination
 	}
 	totalRevealPrevOutput, err := tool.buildEmptyRevealTx(destinations, revealOutValue, request.FeeRate, request.DataList)
 	if err != nil {
-		return "", "", 0, 0, 0, errors.Wrap(err, "build empty reveal tx error")
+		return "", "", 0, 0, errors.Wrap(err, "build empty reveal tx error")
 	}
 
-	totalMiddlePrevOutput, serviceFee, minerFee, err := tool.buildEmptyMiddleTx(totalRevealPrevOutput, destinations[0], revealOutValue, request.FeeRate, int64(len(request.DataList)), request.DataList[0].Runestone)
+	totalMiddlePrevOutput, minerFee, err := tool.buildEmptyMiddleTx(totalRevealPrevOutput, destinations[0], revealOutValue, request.FeeRate, int64(len(request.DataList)), request.DataList[0].Runestone)
 	if err != nil {
-		return "", "", 0, 0, 0, errors.Wrap(err, "build empty middle tx error")
+		return "", "", 0, 0, errors.Wrap(err, "build empty middle tx error")
 	}
 
-	return tool.txCtxDataList[0].commitTxAddress.String(), payAddrPK, totalMiddlePrevOutput, serviceFee, minerFee, nil
+	return tool.txCtxDataList[0].commitTxAddress.String(), payAddrPK, totalMiddlePrevOutput, minerFee, nil
 }
 
 func (tool *RunesMinter) Inscribe(commitTxHash string, actualMiddlePrevOutputFee int64, payAddrPK string, request *InscriptionRequest) (ctxTxData *CtxTxData, err error) {
@@ -184,7 +184,7 @@ func (tool *RunesMinter) Inscribe(commitTxHash string, actualMiddlePrevOutputFee
 		return nil, errors.Wrap(err, "build empty reveal tx error")
 	}
 	fmt.Println("totalRevealPrevOutput, ", totalRevealPrevOutput)
-	totalMiddlePrevOutput, _, _, err := tool.buildEmptyMiddleTx(totalRevealPrevOutput, destinations[0], revealOutValue, request.FeeRate, int64(len(request.DataList)), request.DataList[0].Runestone)
+	totalMiddlePrevOutput, _, err := tool.buildEmptyMiddleTx(totalRevealPrevOutput, destinations[0], revealOutValue, request.FeeRate, int64(len(request.DataList)), request.DataList[0].Runestone)
 	if err != nil {
 		return nil, errors.Wrap(err, "build empty middle tx error")
 	}
@@ -363,12 +363,8 @@ func (tool *RunesMinter) buildEmptyRevealTx(destination []string, revealOutValue
 	return totalPrevOutput, nil
 }
 
-func (tool *RunesMinter) getServiceFeePkScript() (*[]byte, error) {
-	return nil, nil
-}
-
 // note: 构造middleTx: 连接commit tx和（除了第一笔）reveal tx的中间tx： 包含reveal tx1 + commit tx2... + 手续费 + 找零
-func (tool *RunesMinter) buildEmptyMiddleTx(totalRevealPrevOutput int64, firstDestination string, revealOutValue, feeRate, inscAmount int64, runestone runes.RuneStone) (totalPrevOutput, serviceFee, minerFee int64, err error) {
+func (tool *RunesMinter) buildEmptyMiddleTx(totalRevealPrevOutput int64, firstDestination string, revealOutValue, feeRate, inscAmount int64, runestone runes.RuneStone) (totalPrevOutput, minerFee int64, err error) {
 	tx := wire.NewMsgTx(int32(2)) // note: 初始化，创建一个新的middle tx
 
 	addTxInTxOutOfRevealTx1IntoMiddleTx := func(tx *wire.MsgTx, index int) error {
@@ -394,7 +390,7 @@ func (tool *RunesMinter) buildEmptyMiddleTx(totalRevealPrevOutput int64, firstDe
 	// TODO 使用OUTPOINT，而不是默认指定0
 	err = addTxInTxOutOfRevealTx1IntoMiddleTx(tx, 0) // note: 添加第一个reveal tx1的输出
 	if err != nil {
-		return 0, 0, 0, errors.Wrap(err, "add tx in tx out of reveal tx1 into middle tx error")
+		return 0, 0, errors.Wrap(err, "add tx in tx out of reveal tx1 into middle tx error")
 	}
 	// 计算第一个reveal tx1的费用
 	prevOutput := revealOutValue // note: 计算单个reveal tx的文本费用： 铭文的value
@@ -418,13 +414,9 @@ func (tool *RunesMinter) buildEmptyMiddleTx(totalRevealPrevOutput int64, firstDe
 	}
 
 	// 在middle tx的末尾，添加一个给平台手续费操作的uxto输出
-	serviceFee = tool.getServiceFee(inscAmount)
-	servicePkScript, err := tool.getServiceFeePkScript()
-	tx.AddTxOut(wire.NewTxOut(serviceFee, *servicePkScript))
-	totalPrevOutput += serviceFee
 	output, err := runes.CreateRuneStoneOutput(tool.runesCli, runestone)
 	if err != nil {
-		return 0, 0, 0, errors.Wrap(err, "build runestone script fail")
+		return 0, 0, errors.Wrap(err, "build runestone script fail")
 	}
 
 	tx.AddTxOut(output)
@@ -440,7 +432,7 @@ func (tool *RunesMinter) buildEmptyMiddleTx(totalRevealPrevOutput int64, firstDe
 	}
 
 	tool.middleTx = tx
-	return totalPrevOutput, serviceFee, minerFee, nil
+	return totalPrevOutput, minerFee, nil
 }
 
 func (tool *RunesMinter) completeMiddleTx(commitTxHash string, actualMiddlePrevOutputFee int64) error {
@@ -607,10 +599,6 @@ func (tool *RunesMinter) calculateFee() int64 {
 		}
 	}
 	return fees
-}
-
-func (tool *RunesMinter) getServiceFee(inscAmount int64) int64 {
-	return 0
 }
 
 func getTxHex(tx *wire.MsgTx) (string, error) {
