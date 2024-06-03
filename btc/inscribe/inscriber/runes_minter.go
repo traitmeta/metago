@@ -76,10 +76,8 @@ type RevealTxData struct {
 
 type inscriptionTxCtxData struct {
 	privateKey              *btcec.PrivateKey
-	inscriptionScript       []byte
 	commitTxAddress         btcutil.Address
 	commitTxAddressPkScript []byte
-	controlBlockWitness     []byte
 	recoveryPrivateKeyWIF   string
 	revealTxPrevOutput      *wire.TxOut
 	middleTxPrevOutput      *wire.TxOut
@@ -108,11 +106,18 @@ func NewRunesMintInscribeTool(net *chaincfg.Params, btcClient BTCBaseClient, run
 	return tool, nil
 }
 
-func (tool *RunesMinter) GetPayAddrAndFee(request *InscriptionRequest) (payAddr, payAddrPK string, inscFee, minerFee int64, err error) {
+type PayInfo struct {
+	Addr           string
+	PkScript       string
+	InscriptionFee int64
+	MinerFee       int64
+}
+
+func (tool *RunesMinter) GetPayAddrAndFee(request *InscriptionRequest) (*PayInfo, error) {
+	var payInfo = &PayInfo{}
 	tool.txCtxDataList = make([]*inscriptionTxCtxData, len(request.DataList)) // not1e: 初始化，铭文列表
 	tool.revealTxPrevOutputFetcher = txscript.NewMultiPrevOutFetcher(nil)     // note: 初始化，reveal tx的输入
 	tool.middleTxPrevOutputFetcher = txscript.NewMultiPrevOutFetcher(nil)     // note: 初始化，middle tx的输入
-
 	revealOutValue := GetRevealOutValue(request)
 	tool.txCtxDataList = make([]*inscriptionTxCtxData, len(request.DataList)) // note: 初始化，铭文列表
 	destinations := make([]string, len(request.DataList))                     // note: 初始化，铭文的接收地址
@@ -120,31 +125,33 @@ func (tool *RunesMinter) GetPayAddrAndFee(request *InscriptionRequest) (payAddr,
 	for i := 0; i < len(request.DataList); i++ {
 		privateKey, err := btcec.NewPrivateKey() // note: 创建一个密钥对，用来构建reveal tx
 		if err != nil {
-			return "", "", 0, 0, errors.Wrap(err, "create private key error")
+			return nil, errors.Wrap(err, "create private key error")
 		}
 		if i == 0 { // warn: 保存构建第一个铭文的私钥
-			privKeyBytes := privateKey.Serialize()                      // 将私钥转换为字节数组
-			payAddrPK = base64.StdEncoding.EncodeToString(privKeyBytes) // 使用Base64编码将字节数组转换为字符串
+			privKeyBytes := privateKey.Serialize()                             // 将私钥转换为字节数组
+			payInfo.PkScript = base64.StdEncoding.EncodeToString(privKeyBytes) // 使用Base64编码将字节数组转换为字符串
 		}
 		txCtxData, err := createRuneMintTxCtxData(tool.net, request.DataList[i], privateKey) // note: 创建commit交易及包含铭文信息的Taproot脚本信息
 
 		if err != nil {
-			return "", "", 0, 0, errors.Wrap(err, "create inscription tx ctx data error")
+			return nil, errors.Wrap(err, "create inscription tx ctx data error")
 		}
 		tool.txCtxDataList[i] = txCtxData
 		destinations[i] = request.DataList[i].Destination
 	}
+
 	totalRevealPrevOutput, err := tool.buildEmptyRevealTx(destinations, revealOutValue, request.FeeRate, request.DataList)
 	if err != nil {
-		return "", "", 0, 0, errors.Wrap(err, "build empty reveal tx error")
+		return nil, errors.Wrap(err, "build empty reveal tx error")
 	}
 
-	totalMiddlePrevOutput, minerFee, err := tool.buildEmptyMiddleTx(totalRevealPrevOutput, destinations[0], revealOutValue, request.FeeRate, int64(len(request.DataList)), request.DataList[0].Runestone)
+	payInfo.InscriptionFee, payInfo.MinerFee, err = tool.buildEmptyMiddleTx(totalRevealPrevOutput, destinations[0], revealOutValue, request.FeeRate, int64(len(request.DataList)), request.DataList[0].Runestone)
 	if err != nil {
-		return "", "", 0, 0, errors.Wrap(err, "build empty middle tx error")
+		return nil, errors.Wrap(err, "build empty middle tx error")
 	}
 
-	return tool.txCtxDataList[0].commitTxAddress.String(), payAddrPK, totalMiddlePrevOutput, minerFee, nil
+	payInfo.Addr = tool.txCtxDataList[0].commitTxAddress.String()
+	return payInfo, nil
 }
 
 func (tool *RunesMinter) Inscribe(commitTxHash string, actualMiddlePrevOutputFee int64, payAddrPK string, request *InscriptionRequest) (ctxTxData *CtxTxData, err error) {
