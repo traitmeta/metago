@@ -34,7 +34,7 @@ type WrapTx struct {
 	MinerFee            int64                         `json:"miner_fee"`
 }
 
-type PrivateKeyAndScriptInfo struct {
+type WalletInfo struct {
 	PrivateKey      *btcec.PrivateKey `json:"private_key"`
 	Address         btcutil.Address   `json:"address"`
 	PkScript        []byte            `json:"pk_script"`

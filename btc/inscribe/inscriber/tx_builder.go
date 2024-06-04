@@ -17,7 +17,7 @@ type Builder struct {
 	net *chaincfg.Params
 }
 
-var addTxInTxOutIntoTx = func(tx *wire.MsgTx, index int, destination, runeId string, net *chaincfg.Params) error {
+var buildRuneMintTx = func(tx *wire.MsgTx, index int, destination, runeId string, net *chaincfg.Params) error {
 	in := wire.NewTxIn(&wire.OutPoint{Index: uint32(index)}, nil, nil)
 	in.Sequence = defaultSequenceNum
 	tx.AddTxIn(in)
@@ -37,13 +37,14 @@ var addTxInTxOutIntoTx = func(tx *wire.MsgTx, index int, destination, runeId str
 	if err != nil {
 		return errors.Wrap(err, "pay to address script error")
 	}
+
 	out := wire.NewTxOut(defaultRevealOutValue, scriptPubKey) // note: 再构造reveal tx的交易输出，也就是铭文的接收地址
 	tx.AddTxOut(out)
 	return nil
 }
 
-func (b *Builder) BuildPrivateAndScriptInfo(req MintReq, payAddrPK string) ([]*PrivateKeyAndScriptInfo, error) {
-	var pkAndScripts []*PrivateKeyAndScriptInfo
+func (b *Builder) BuildAllUsedWallet(req MintReq, payAddrPK string) ([]*WalletInfo, error) {
+	var pkAndScripts []*WalletInfo
 	for i := 0; i < req.Count; i++ {
 		var privateKey *btcec.PrivateKey
 		var err error
@@ -61,7 +62,7 @@ func (b *Builder) BuildPrivateAndScriptInfo(req MintReq, payAddrPK string) ([]*P
 			}
 		}
 
-		info, err := createPkAndScriptInfo(b.net, privateKey)
+		info, err := createWallet(b.net, privateKey)
 		if err != nil {
 			return nil, errors.Wrap(err, "create inscription tx ctx data error")
 		}
@@ -76,7 +77,7 @@ func (b *Builder) BuildPrivateAndScriptInfo(req MintReq, payAddrPK string) ([]*P
 func (b *Builder) BuildMiddleTxWithEmptyInput(req MintReq, revealTxs []*WrapTx, prevScript []byte) (*WrapTx, error) {
 	tx := wire.NewMsgTx(int32(2))
 	// TODO 使用OUTPOINT，而不是默认指定0
-	if err := addTxInTxOutIntoTx(tx, 0, req.Receiver, req.RuneId, b.net); err != nil {
+	if err := buildRuneMintTx(tx, 0, req.Receiver, req.RuneId, b.net); err != nil {
 		return nil, errors.Wrap(err, "add tx in tx out of reveal tx1 into middle tx error")
 	}
 
@@ -113,7 +114,7 @@ func (b *Builder) BuildMiddleTxWithEmptyInput(req MintReq, revealTxs []*WrapTx, 
 	return wrapTx, nil
 }
 
-func (b *Builder) BuildRevealTxsWithEmptyInput(pkAndScripts []*PrivateKeyAndScriptInfo, req MintReq) ([]*WrapTx, error) {
+func (b *Builder) BuildRevealTxsWithEmptyInput(pkAndScripts []*WalletInfo, req MintReq) ([]*WrapTx, error) {
 	// Note: first rune in middle tx，others in reveal txs
 	revealTx := make([]*WrapTx, req.Count-1)
 
@@ -129,11 +130,11 @@ func (b *Builder) BuildRevealTxsWithEmptyInput(pkAndScripts []*PrivateKeyAndScri
 	return revealTx, nil
 }
 
-func (b *Builder) buildRevealTxWithEmptyInput(idx int, pkAndScripts []*PrivateKeyAndScriptInfo, req MintReq) (*WrapTx, error) {
+func (b *Builder) buildRevealTxWithEmptyInput(idx int, pkAndScripts []*WalletInfo, req MintReq) (*WrapTx, error) {
 	var revealWrapTx *WrapTx
 
 	tx := wire.NewMsgTx(int32(2))
-	err := addTxInTxOutIntoTx(tx, idx, req.Receiver, req.RuneId, b.net)
+	err := buildRuneMintTx(tx, idx, req.Receiver, req.RuneId, b.net)
 	if err != nil {
 		return nil, errors.Wrap(err, "add tx in tx out into reveal tx error")
 	}
@@ -153,7 +154,7 @@ func (b *Builder) buildRevealTxWithEmptyInput(idx int, pkAndScripts []*PrivateKe
 	return revealWrapTx, nil
 }
 
-func createPkAndScriptInfo(net *chaincfg.Params, privateKey *btcec.PrivateKey) (*PrivateKeyAndScriptInfo, error) {
+func createWallet(net *chaincfg.Params, privateKey *btcec.PrivateKey) (*WalletInfo, error) {
 	commitTxAddress, err := btcutil.NewAddressTaproot(txscript.ComputeTaprootKeyNoScript(privateKey.PubKey()).SerializeCompressed()[1:], net)
 	log.Println("commitTxAddress: ", commitTxAddress)
 	if err != nil {
@@ -170,7 +171,7 @@ func createPkAndScriptInfo(net *chaincfg.Params, privateKey *btcec.PrivateKey) (
 		return nil, errors.Wrap(err, "create recovery private key wif error")
 	}
 
-	return &PrivateKeyAndScriptInfo{
+	return &WalletInfo{
 		PrivateKey:      privateKey,
 		Address:         commitTxAddress,
 		PkScript:        commitTxAddressPkScript,
