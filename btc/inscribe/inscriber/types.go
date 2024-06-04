@@ -31,6 +31,7 @@ type WrapTx struct {
 	PrevOutput          *wire.TxOut                   `json:"prev_output"`
 	TxPrevOutputFetcher *txscript.MultiPrevOutFetcher `json:"tx_prev_output_fetcher"`
 	WireTx              *wire.MsgTx                   `json:"wire_tx"`
+	MinerFee            int64                         `json:"miner_fee"`
 }
 
 type PrivateKeyAndScriptInfo struct {
