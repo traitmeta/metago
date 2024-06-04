@@ -2,11 +2,14 @@ package inscriber
 
 import (
 	"encoding/base64"
-	"log"
+	"fmt"
 
+	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/pkg/errors"
@@ -62,7 +65,7 @@ func (b *Builder) BuildAllUsedWallet(req MintReq, payAddrPK string) ([]*WalletIn
 			}
 		}
 
-		info, err := createWallet(b.net, privateKey)
+		info, err := CreateWallet(b.net, privateKey)
 		if err != nil {
 			return nil, errors.Wrap(err, "create inscription tx ctx data error")
 		}
@@ -154,27 +157,40 @@ func (b *Builder) buildRevealTxWithEmptyInput(idx int, pkAndScripts []*WalletInf
 	return revealWrapTx, nil
 }
 
-func createWallet(net *chaincfg.Params, privateKey *btcec.PrivateKey) (*WalletInfo, error) {
-	commitTxAddress, err := btcutil.NewAddressTaproot(txscript.ComputeTaprootKeyNoScript(privateKey.PubKey()).SerializeCompressed()[1:], net)
-	log.Println("commitTxAddress: ", commitTxAddress)
+// 1. fill commit tx value
+// 2. sign transaction
+func (b *Builder) CompleteMiddleTx(privKey btcec.PrivateKey, middleTx *WrapTx, commitTxHash string, actualMiddlePrevOutputFee int64) error {
+	newCommitTxHash, err := chainhash.NewHashFromStr(commitTxHash)
 	if err != nil {
-		return nil, errors.Wrap(err, "create commit tx address error")
+		return errors.Wrap(err, "failed converting transaction hash")
 	}
 
-	commitTxAddressPkScript, err := txscript.PayToAddrScript(commitTxAddress)
+	fmt.Println("newCommitTxHash", newCommitTxHash)
+	middleTx.PrevOutput.Value = actualMiddlePrevOutputFee
+	middleTx.TxPrevOutputFetcher.AddPrevOut(wire.OutPoint{
+		Hash:  *newCommitTxHash,
+		Index: uint32(0),
+	}, middleTx.PrevOutput)
+	middleTx.WireTx.TxIn[0].PreviousOutPoint.Hash = *newCommitTxHash
+
+	witnessArray, err := txscript.CalcTaprootSignatureHash(txscript.NewTxSigHashes(middleTx.WireTx, middleTx.TxPrevOutputFetcher),
+		txscript.SigHashDefault, middleTx.WireTx, 0, middleTx.TxPrevOutputFetcher)
 	if err != nil {
-		return nil, errors.Wrap(err, "create commit tx address pk script error")
+		return errors.Wrap(err, "calc tapscript signaturehash error")
 	}
 
-	recoveryPrivateKeyWIF, err := btcutil.NewWIF(txscript.TweakTaprootPrivKey(*privateKey, []byte{}), net, true)
+	priv := txscript.TweakTaprootPrivKey(privKey, []byte{})
+	signature, err := schnorr.Sign(priv, witnessArray)
 	if err != nil {
-		return nil, errors.Wrap(err, "create recovery private key wif error")
+		return errors.Wrap(err, "schnorr sign error")
+	}
+	witness := wire.TxWitness{signature.Serialize()}
+	middleTx.WireTx.TxIn[0].Witness = witness
+
+	revealWeight := blockchain.GetTransactionWeight(btcutil.NewTx(middleTx.WireTx))
+	if revealWeight > MaxStandardTxWeight {
+		return errors.New(fmt.Sprintf("middle transaction weight greater than %d (MAX_STANDARD_TX_WEIGHT): %d", MaxStandardTxWeight, revealWeight))
 	}
 
-	return &WalletInfo{
-		PrivateKey:      privateKey,
-		Address:         commitTxAddress,
-		PkScript:        commitTxAddressPkScript,
-		RecoveryPKofWIF: recoveryPrivateKeyWIF.String(),
-	}, nil
+	return nil
 }
