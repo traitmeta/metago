@@ -20,6 +20,12 @@ type Builder struct {
 	net *chaincfg.Params
 }
 
+func NewBuilder(net *chaincfg.Params) *Builder {
+	return &Builder{
+		net: net,
+	}
+}
+
 var buildRuneMintTx = func(tx *wire.MsgTx, index int, destination, runeId string, net *chaincfg.Params) error {
 	in := wire.NewTxIn(&wire.OutPoint{Index: uint32(index)}, nil, nil)
 	in.Sequence = defaultSequenceNum

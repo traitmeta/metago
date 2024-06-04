@@ -251,32 +251,6 @@ func (tool *RunesMinter) Inscribe(commitTxHash string, actualMiddlePrevOutputFee
 	return ctxTxData, nil
 }
 
-func createRuneMintTxCtxData(net *chaincfg.Params, privateKey *btcec.PrivateKey) (*inscriptionTxCtxData, error) {
-	// note: 生成最终的 Taproot 地址（commit tx 的输出地址）和 Pay-to-Taproot(P2TR) 地址的脚本。
-	commitTxAddress, err := btcutil.NewAddressTaproot(txscript.ComputeTaprootKeyNoScript(privateKey.PubKey()).SerializeCompressed()[1:], net)
-	log.Println("commitTxAddress: ", commitTxAddress)
-	if err != nil {
-		return nil, errors.Wrap(err, "create commit tx address error")
-	}
-
-	commitTxAddressPkScript, err := txscript.PayToAddrScript(commitTxAddress)
-	if err != nil {
-		return nil, errors.Wrap(err, "create commit tx address pk script error")
-	}
-
-	recoveryPrivateKeyWIF, err := btcutil.NewWIF(txscript.TweakTaprootPrivKey(*privateKey, []byte{}), net, true)
-	if err != nil {
-		return nil, errors.Wrap(err, "create recovery private key wif error")
-	}
-
-	return &inscriptionTxCtxData{
-		privateKey:              privateKey,
-		commitTxAddress:         commitTxAddress,
-		commitTxAddressPkScript: commitTxAddressPkScript,
-		recoveryPrivateKeyWIF:   recoveryPrivateKeyWIF.String(),
-	}, nil
-}
-
 func (tool *RunesMinter) buildEmptyRevealTx(destination []string, feeRate int64, runeId string) (err error) {
 	var revealTx []*wire.MsgTx
 	total := len(tool.txCtxDataList)
@@ -548,4 +522,99 @@ func getTxHex(tx *wire.MsgTx) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(buf.Bytes()), nil
+}
+
+func createRuneMintTxCtxData(net *chaincfg.Params, privateKey *btcec.PrivateKey) (*inscriptionTxCtxData, error) {
+	// note: 生成最终的 Taproot 地址（commit tx 的输出地址）和 Pay-to-Taproot(P2TR) 地址的脚本。
+	commitTxAddress, err := btcutil.NewAddressTaproot(txscript.ComputeTaprootKeyNoScript(privateKey.PubKey()).SerializeCompressed()[1:], net)
+	log.Println("commitTxAddress: ", commitTxAddress)
+	if err != nil {
+		return nil, errors.Wrap(err, "create commit tx address error")
+	}
+
+	commitTxAddressPkScript, err := txscript.PayToAddrScript(commitTxAddress)
+	if err != nil {
+		return nil, errors.Wrap(err, "create commit tx address pk script error")
+	}
+
+	recoveryPrivateKeyWIF, err := btcutil.NewWIF(txscript.TweakTaprootPrivKey(*privateKey, []byte{}), net, true)
+	if err != nil {
+		return nil, errors.Wrap(err, "create recovery private key wif error")
+	}
+
+	return &inscriptionTxCtxData{
+		privateKey:              privateKey,
+		commitTxAddress:         commitTxAddress,
+		commitTxAddressPkScript: commitTxAddressPkScript,
+		recoveryPrivateKeyWIF:   recoveryPrivateKeyWIF.String(),
+	}, nil
+}
+
+func (tool *RunesMinter) InscribeRunes(commitTxHash string, actualMiddlePrevOutputFee int64, payAddrPK string, req MintReq) (ctxTxData *CtxTxData, err error) {
+	var builder = NewBuilder(tool.net)
+	allWallet, err := builder.BuildAllUsedWallet(req, payAddrPK)
+	if err != nil {
+		return nil, errors.Wrap(err, "build all used wallet error")
+	}
+
+	revealWrapTxs, err := builder.BuildRevealTxsWithEmptyInput(allWallet, req)
+	if err != nil {
+		return nil, errors.Wrap(err, "build all empty reveal tx error")
+	}
+
+	middleWrapTx, err := builder.BuildMiddleTxWithEmptyInput(req, revealWrapTxs, allWallet[0].PkScript)
+	if err != nil {
+		return nil, errors.Wrap(err, "build empty middle tx error")
+	}
+
+	if middleWrapTx.PrevOutput.Value > actualMiddlePrevOutputFee {
+		return nil, errors.New("actualMiddlePrevOutputFee is not enough")
+	}
+
+	if err = builder.CompleteMiddleTx(*allWallet[0].PrivateKey, middleWrapTx, commitTxHash, actualMiddlePrevOutputFee); err != nil {
+		return nil, errors.Wrap(err, "complete middle tx error")
+	}
+
+	if err = builder.CompleteRevealTxs(revealWrapTxs, allWallet, middleWrapTx.WireTx.TxHash()); err != nil {
+		return nil, errors.Wrap(err, "complete reveal tx error")
+	}
+
+	middleTxHash, err := tool.sendRawTransaction(tool.middleTx)
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("send middle tx error: tx_hash %s", tool.middleTx.TxHash().String()))
+	}
+	log.Printf("middleTxHash %s \n", middleTxHash.String())
+
+	// warn: err info：{"code":-26,"message":"too-long-mempool-chain, too many descendants for tx... [limit: 25]"}
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var firstErr error
+
+	minTx := min(len(tool.revealTx), 23)
+	for i := 0; i < minTx; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			revealTxHash, err := tool.sendRawTransaction(tool.revealTx[i])
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				if firstErr == nil {
+					firstErr = err
+				}
+				return
+			}
+			log.Printf("revealTxHash %d %s \n", i, revealTxHash.String())
+			ctxTxData.RevealTxData[i].IsSend = true
+			ctxTxData.RevealTxData[i].RevealTxHash = revealTxHash.String()
+			ctxTxData.RevealTxData[i].InscriptionId = fmt.Sprintf("%si0", revealTxHash)
+		}(i)
+	}
+	wg.Wait()
+
+	if firstErr != nil {
+		return ctxTxData, firstErr
+	}
+
+	return ctxTxData, nil
 }
