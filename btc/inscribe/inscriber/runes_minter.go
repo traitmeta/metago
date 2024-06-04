@@ -550,7 +550,7 @@ func createRuneMintTxCtxData(net *chaincfg.Params, privateKey *btcec.PrivateKey)
 	}, nil
 }
 
-func (tool *RunesMinter) InscribeRunes(commitTxHash string, actualMiddlePrevOutputFee int64, payAddrPK string, req MintReq) (ctxTxData *CtxTxData, err error) {
+func (tool *RunesMinter) BuildRunesTxs(commitTxHash string, actualMiddlePrevOutputFee int64, payAddrPK string, req MintReq) (ctxTxData *CtxTxData, err error) {
 	var builder = NewBuilder(tool.net)
 	allWallet, err := builder.BuildAllUsedWallet(req, payAddrPK)
 	if err != nil {
@@ -607,7 +607,6 @@ func (tool *RunesMinter) InscribeRunes(commitTxHash string, actualMiddlePrevOutp
 			log.Printf("revealTxHash %d %s \n", i, revealTxHash.String())
 			ctxTxData.RevealTxData[i].IsSend = true
 			ctxTxData.RevealTxData[i].RevealTxHash = revealTxHash.String()
-			ctxTxData.RevealTxData[i].InscriptionId = fmt.Sprintf("%si0", revealTxHash)
 		}(i)
 	}
 	wg.Wait()
@@ -617,4 +616,34 @@ func (tool *RunesMinter) InscribeRunes(commitTxHash string, actualMiddlePrevOutp
 	}
 
 	return ctxTxData, nil
+}
+
+func (tool *RunesMinter) SendRunesTxs(middleTx *WrapTx, revealTxs []*WrapTx) (map[string]bool, error) {
+	var sendTxMap = make(map[string]bool)
+
+	middleTxHash, err := tool.sendRawTransaction(middleTx.WireTx)
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("send middle tx error: tx_hash %s", tool.middleTx.TxHash().String()))
+	}
+	log.Printf("middleTxHash %s \n", middleTxHash.String())
+
+	sendTxMap[middleTxHash.String()] = true
+	var wg sync.WaitGroup
+	minTx := min(len(revealTxs), 23)
+	for i := 0; i < minTx; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			revealTxHash, err := tool.sendRawTransaction(revealTxs[i].WireTx)
+			if err != nil {
+				log.Printf("revealTxHash %d %s , err: %v \n", i, revealTxHash.String(), err)
+				return
+			}
+
+			sendTxMap[revealTxHash.String()] = true
+		}(i)
+	}
+	wg.Wait()
+
+	return sendTxMap, nil
 }
