@@ -194,3 +194,41 @@ func (b *Builder) CompleteMiddleTx(privKey btcec.PrivateKey, middleTx *WrapTx, c
 
 	return nil
 }
+
+func (b *Builder) CompleteRevealTxs(revealTxs []*WrapTx, pkAndScripts []*WalletInfo, middleTxHash chainhash.Hash) error {
+	for i := range revealTxs {
+		revealTxs[i].TxPrevOutputFetcher.AddPrevOut(wire.OutPoint{
+			Hash:  middleTxHash,
+			Index: uint32(i),
+		}, revealTxs[i].PrevOutput)
+
+		revealTxs[i].WireTx.TxIn[0].PreviousOutPoint.Hash = middleTxHash
+	}
+
+	for i := range revealTxs {
+		idx := 0
+
+		witnessArray, err := txscript.CalcTaprootSignatureHash(txscript.NewTxSigHashes(revealTxs[i].WireTx, revealTxs[i].TxPrevOutputFetcher),
+			txscript.SigHashDefault, revealTxs[i].WireTx, idx, revealTxs[i].TxPrevOutputFetcher)
+		if err != nil {
+			return errors.Wrap(err, "calc tapscript signaturehash error")
+		}
+
+		priv := txscript.TweakTaprootPrivKey(*pkAndScripts[i+1].PrivateKey, []byte{})
+		signature, err := schnorr.Sign(priv, witnessArray)
+		if err != nil {
+			return errors.Wrap(err, "schnorr sign error")
+		}
+
+		revealTxs[i].WireTx.TxIn[0].Witness = wire.TxWitness{signature.Serialize()}
+	}
+
+	// check tx max tx wight
+	for i, tx := range revealTxs {
+		revealWeight := blockchain.GetTransactionWeight(btcutil.NewTx(tx.WireTx))
+		if revealWeight > MaxStandardTxWeight {
+			return errors.New(fmt.Sprintf("reveal(index %d) transaction weight greater than %d (MAX_STANDARD_TX_WEIGHT): %d", i, MaxStandardTxWeight, revealWeight))
+		}
+	}
+	return nil
+}
