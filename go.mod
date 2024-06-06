@@ -6,7 +6,10 @@ toolchain go1.21.6
 
 require (
 	github.com/99designs/gqlgen v0.17.20
+	github.com/btcsuite/btcd v0.24.0
+	github.com/btcsuite/btcd/btcec/v2 v2.3.3
 	github.com/btcsuite/btcd/btcutil v1.1.5
+	github.com/btcsuite/btcd/btcutil/psbt v1.1.9
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0
 	github.com/ethereum/go-ethereum v1.13.8
 	github.com/holiman/uint256 v1.2.4
@@ -18,6 +21,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/traitmeta/gotos v0.0.0-20240101074157-74a5c12d9c6a
+	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/vektah/gqlparser/v2 v2.5.1
 	go.uber.org/zap v1.21.0
 	golang.org/x/crypto v0.21.0
@@ -55,9 +59,6 @@ require (
 require (
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/agnivade/levenshtein v1.1.1 // indirect
-	github.com/btcsuite/btcd v0.24.0
-	github.com/btcsuite/btcd/btcec/v2 v2.2.0
-	github.com/btcsuite/btcd/btcutil/psbt v1.1.9
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
