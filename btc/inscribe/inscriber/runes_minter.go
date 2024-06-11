@@ -6,67 +6,23 @@ import (
 	"log"
 	"sync"
 
-	"github.com/btcsuite/btcd/btcec/v2"
-	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/pkg/errors"
 
 	"github.com/traitmeta/metago/btc/runes-tools/txbuilder/runes"
 )
 
-type CtxTxData struct {
-	//commit tx imfo
-	PrevCommitTxHash string // 相应的commit tx的哈希
-
-	//middle tx info
-	MiddleTx            *wire.MsgTx // middle tx的具体数据
-	MiddleTxHash        string      // middle tx的哈希
-	MiddleInscriptionId string      // 在 middle tx 铭刻的铭文Id
-
-	//reveal tx info
-	RevealTxData []*RevealTxData // reveal tx data
-}
-
-type RevealTxData struct {
-	CtxPrivateKey         string      // private key, Base64编码
-	RecoveryPrivateKeyWIF string      // 用于恢复私钥的WIF格式的私钥
-	RevealTx              *wire.MsgTx // 揭示交易的具体数据
-
-	// inscribed inscriptions info
-	IsSend        bool   // 是否已成功发送交易
-	RevealTxHash  string // 已成功发送后，揭示交易的哈希
-	InscriptionId string // 已成功发送后，已铭刻铭文的铭文Id
-}
-
-type inscriptionTxCtxData struct {
-	privateKey              *btcec.PrivateKey
-	commitTxAddress         btcutil.Address
-	commitTxAddressPkScript []byte
-	recoveryPrivateKeyWIF   string
-	revealTxPrevOutput      *wire.TxOut
-	middleTxPrevOutput      *wire.TxOut
-}
-
 type RunesMinter struct {
-	net                       *chaincfg.Params
-	client                    BTCBaseClient
-	txCtxDataList             []*inscriptionTxCtxData
-	revealTxPrevOutputFetcher *txscript.MultiPrevOutFetcher // note: 用于获取reveal tx的输入
-	revealTx                  []*wire.MsgTx                 // note: reveal tx
-	commitTx                  *wire.MsgTx                   // note: commit tx
-	middleTxPrevOutputFetcher *txscript.MultiPrevOutFetcher // note: 用于获取middle tx的输入
-	middleTx                  *wire.MsgTx                   // note: 连接commit tx和（除了第一笔）reveal tx的中间tx： 包含reveal tx1 + commit tx2... + 手续费 + 找零
+	net    *chaincfg.Params
+	client BTCBaseClient
 }
 
 func NewRunesMintInscribeTool(net *chaincfg.Params, btcClient BTCBaseClient, runesCli *runes.Client) (*RunesMinter, error) {
 	tool := &RunesMinter{
-		net:                       net,
-		client:                    btcClient,
-		revealTxPrevOutputFetcher: txscript.NewMultiPrevOutFetcher(nil),
-		middleTxPrevOutputFetcher: txscript.NewMultiPrevOutFetcher(nil),
+		net:    net,
+		client: btcClient,
 	}
 	return tool, nil
 }
@@ -93,34 +49,6 @@ func (tool *RunesMinter) Inscribe(commitTxHash string, actualMiddlePrevOutputFee
 	}
 
 	return sendResult, nil
-}
-
-func (tool *RunesMinter) GetRecoveryKeyWIFList() []string {
-	wifList := make([]string, len(tool.txCtxDataList))
-	for i := range tool.txCtxDataList {
-		wifList[i] = tool.txCtxDataList[i].recoveryPrivateKeyWIF
-	}
-	return wifList
-}
-
-func (tool *RunesMinter) GetCommitTxHex() (string, error) {
-	return getTxHex(tool.commitTx)
-}
-
-func (tool *RunesMinter) GetMiddleTxHex() (string, error) {
-	return getTxHex(tool.middleTx)
-}
-
-func (tool *RunesMinter) GetRevealTxHexList() ([]string, error) {
-	txHexList := make([]string, len(tool.revealTx))
-	for i := range tool.revealTx {
-		txHex, err := getTxHex(tool.revealTx[i])
-		if err != nil {
-			return nil, err
-		}
-		txHexList[i] = txHex
-	}
-	return txHexList, nil
 }
 
 func (tool *RunesMinter) sendRawTransaction(tx *wire.MsgTx) (*chainhash.Hash, error) {
