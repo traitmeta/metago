@@ -40,3 +40,9 @@ type WalletInfo struct {
 	PkScript        []byte            `json:"pk_script"`
 	RecoveryPKofWIF string            `json:"recovery_pk_of_wif"`
 }
+
+type SendResult struct {
+	MiddleTx  *WrapTx
+	RevealTxs []*WrapTx
+	TxsStatus map[string]bool
+}

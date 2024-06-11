@@ -1,6 +1,6 @@
 # ABI to Go
 1. install abigen 
-    go install github.com/ethereum/go-ethereum/cmd/abigen@latest
+    `go install github.com/ethereum/go-ethereum/cmd/abigen@latest`
 ## compile example
 
 `solc --abi erc20.sol -o ./`
