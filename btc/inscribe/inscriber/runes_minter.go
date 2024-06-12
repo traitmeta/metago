@@ -10,8 +10,6 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/pkg/errors"
-
-	"github.com/traitmeta/metago/btc/runes-tools/txbuilder/runes"
 )
 
 type RunesMinter struct {
@@ -19,12 +17,13 @@ type RunesMinter struct {
 	client BTCBaseClient
 }
 
-func NewRunesMintInscribeTool(net *chaincfg.Params, btcClient BTCBaseClient, runesCli *runes.Client) (*RunesMinter, error) {
+func NewRunesMinter(net *chaincfg.Params, btcClient BTCBaseClient) *RunesMinter {
 	tool := &RunesMinter{
 		net:    net,
 		client: btcClient,
 	}
-	return tool, nil
+
+	return tool
 }
 
 type PayInfo struct {
@@ -34,13 +33,13 @@ type PayInfo struct {
 	MinerFee       int64
 }
 
-func (tool *RunesMinter) Inscribe(commitTxHash string, actualMiddlePrevOutputFee int64, payAddrPK string, req MintReq) (*SendResult, error) {
-	middleTx, revealTxs, err := tool.BuildRunesTxs(commitTxHash, actualMiddlePrevOutputFee, payAddrPK, req)
+func (rm *RunesMinter) Inscribe(commitTxHash string, actualMiddlePrevOutputFee int64, payAddrPK string, req MintReq) (*SendResult, error) {
+	middleTx, revealTxs, err := rm.BuildRunesTxs(commitTxHash, actualMiddlePrevOutputFee, payAddrPK, req)
 	if err != nil {
 		return nil, err
 	}
 
-	sendMap := tool.SendRunesTxs(middleTx, revealTxs)
+	sendMap := rm.SendRunesTxs(middleTx, revealTxs)
 
 	var sendResult = &SendResult{
 		MiddleTx:  middleTx,
@@ -51,8 +50,8 @@ func (tool *RunesMinter) Inscribe(commitTxHash string, actualMiddlePrevOutputFee
 	return sendResult, nil
 }
 
-func (tool *RunesMinter) sendRawTransaction(tx *wire.MsgTx) (*chainhash.Hash, error) {
-	return tool.client.SendRawTransaction(tx)
+func (rm *RunesMinter) sendRawTransaction(tx *wire.MsgTx) (*chainhash.Hash, error) {
+	return rm.client.SendRawTransaction(tx)
 }
 
 func getTxHex(tx *wire.MsgTx) (string, error) {
@@ -63,8 +62,28 @@ func getTxHex(tx *wire.MsgTx) (string, error) {
 	return hex.EncodeToString(buf.Bytes()), nil
 }
 
-func (tool *RunesMinter) BuildRunesTxs(commitTxHash string, actualMiddlePrevOutputFee int64, payAddrPK string, req MintReq) (*WrapTx, []*WrapTx, error) {
-	var builder = NewBuilder(tool.net)
+func (rm *RunesMinter) CalcRunesTxsFee(payAddrPK string, req MintReq) (int64, error) {
+	var builder = NewBuilder(rm.net)
+	allWallet, err := builder.BuildAllUsedWallet(req, payAddrPK)
+	if err != nil {
+		return 0, errors.Wrap(err, "build all used wallet error")
+	}
+
+	revealWrapTxs, err := builder.BuildRevealTxsWithEmptyInput(allWallet, req)
+	if err != nil {
+		return 0, errors.Wrap(err, "build all empty reveal tx error")
+	}
+
+	middleWrapTx, err := builder.BuildMiddleTxWithEmptyInput(req, revealWrapTxs, allWallet[0].PkScript)
+	if err != nil {
+		return 0, errors.Wrap(err, "build empty middle tx error")
+	}
+
+	return middleWrapTx.PrevOutput.Value, nil
+}
+
+func (rm *RunesMinter) BuildRunesTxs(commitTxHash string, actualMiddlePrevOutputFee int64, payAddrPK string, req MintReq) (*WrapTx, []*WrapTx, error) {
+	var builder = NewBuilder(rm.net)
 	allWallet, err := builder.BuildAllUsedWallet(req, payAddrPK)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "build all used wallet error")
@@ -95,10 +114,10 @@ func (tool *RunesMinter) BuildRunesTxs(commitTxHash string, actualMiddlePrevOutp
 	return middleWrapTx, revealWrapTxs, nil
 }
 
-func (tool *RunesMinter) SendRunesTxs(middleTx *WrapTx, revealTxs []*WrapTx) map[string]bool {
+func (rm *RunesMinter) SendRunesTxs(middleTx *WrapTx, revealTxs []*WrapTx) map[string]bool {
 	var sendTxMap = make(map[string]bool)
 
-	middleTxHash, err := tool.sendRawTransaction(middleTx.WireTx)
+	middleTxHash, err := rm.sendRawTransaction(middleTx.WireTx)
 	if err != nil {
 		log.Printf("send middle tx error %s \n", middleTxHash.String())
 		return nil
@@ -112,7 +131,7 @@ func (tool *RunesMinter) SendRunesTxs(middleTx *WrapTx, revealTxs []*WrapTx) map
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			revealTxHash, err := tool.sendRawTransaction(revealTxs[i].WireTx)
+			revealTxHash, err := rm.sendRawTransaction(revealTxs[i].WireTx)
 			if err != nil {
 				log.Printf("revealTxHash %d %s , err: %v \n", i, revealTxHash.String(), err)
 				return

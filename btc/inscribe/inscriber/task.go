@@ -16,6 +16,16 @@ type SendTask struct {
 	count   int64
 }
 
+func NewSendTask(client BTCBaseClient, who, runes, orderId string, count int64) *SendTask {
+	return &SendTask{
+		client:  client,
+		who:     who,
+		runes:   runes,
+		orderId: orderId,
+		count:   count,
+	}
+}
+
 func (s *SendTask) LoopSendTxs(sr *SendResult) {
 	for {
 		if v, ok := sr.TxsStatus[sr.MiddleTx.WireTx.TxHash().String()]; !ok || !v {
