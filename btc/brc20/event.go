@@ -11,7 +11,7 @@ import (
 
 // Global variables
 var (
-	blockStartMaxEventID                   int
+	blockStartMaxEventID                   int64
 	brc20EventsInsertCache                 []Event
 	brc20TickersInsertCache                []Ticker
 	brc20TickersRemainingSupplyUpdateCache = make(map[string]decimal.Decimal)
@@ -57,7 +57,7 @@ type WalletBalance struct {
 }
 
 // deployInscribe handles deploy-inscribe events
-func deployInscribe(blockHeight int, inscriptionID, deployerPkScript, deployerWallet, tick, originalTick string, maxSupply, decimals, limitPerMint int, isSelfMint string) {
+func deployInscribe(blockHeight int64, inscriptionID, deployerPkScript, deployerWallet, tick, originalTick string, maxSupply, limitPerMint decimal.Decimal, decimals int, isSelfMint string) {
 	event := map[string]string{
 		"deployer_pkScript": deployerPkScript,
 		"deployer_wallet":   deployerWallet,
@@ -71,7 +71,7 @@ func deployInscribe(blockHeight int, inscriptionID, deployerPkScript, deployerWa
 	eventStr, _ := json.Marshal(event)
 	blockEventsStr += string(eventStr) + EVENT_SEPARATOR
 
-	eventID := blockStartMaxEventID + len(brc20EventsInsertCache) + 1
+	eventID := blockStartMaxEventID + int64(len(brc20EventsInsertCache)+1)
 	brc20EventsInsertCache = append(brc20EventsInsertCache, Event{eventID, eventTypes["deploy-inscribe"], blockHeight, inscriptionID, string(eventStr)})
 
 	brc20TickersInsertCache = append(brc20TickersInsertCache, Ticker{tick, originalTick, maxSupply, decimals, limitPerMint, maxSupply, blockHeight, isSelfMint == "true", inscriptionID})
@@ -92,7 +92,7 @@ func mintInscribe(blockHeight int64, inscriptionID, mintedPkScript, mintedWallet
 	eventStr, _ := json.Marshal(event)
 	blockEventsStr += string(eventStr) + EVENT_SEPARATOR
 
-	eventID := blockStartMaxEventID + len(brc20EventsInsertCache) + 1
+	eventID := blockStartMaxEventID + int64(len(brc20EventsInsertCache)+1)
 	brc20EventsInsertCache = append(brc20EventsInsertCache, Event{eventID, eventTypes["mint-inscribe"], blockHeight, inscriptionID, string(eventStr)})
 	brc20TickersRemainingSupplyUpdateCache[tick] = brc20TickersRemainingSupplyUpdateCache[tick].Add(amount)
 
