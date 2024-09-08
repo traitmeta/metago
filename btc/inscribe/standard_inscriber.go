@@ -70,7 +70,7 @@ type Info struct {
 
 func (ins *StandardInscriber) AddInOutToTx(tx *wire.MsgTx, index int, destination string, revealOutValue int64) error {
 	in := wire.NewTxIn(&wire.OutPoint{Index: uint32(index)}, nil, nil) // note: 先构造reveal tx的空交易输入
-	in.Sequence = defaultSequenceNum
+	in.Sequence = DefaultSequenceNum
 	tx.AddTxIn(in)
 	receiver, err := btcutil.DecodeAddress(destination, ins.net) // note: 生成铭文的接收地址, 这里是destination[index]的P2TR地址
 	if err != nil {

@@ -1,4 +1,4 @@
-package ord
+package types
 
 import (
 	"github.com/btcsuite/btcd/blockchain"
@@ -12,5 +12,5 @@ const (
 
 const (
 	DefaultRevealOutValue = int64(546)
-	MinRevealOutValue     = int64(294)
+	MinRevealOutValue     = int64(330)
 )

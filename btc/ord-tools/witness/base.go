@@ -1,82 +1,85 @@
-package ord
+package witness
 
 import (
-	"bytes"
-	"encoding/hex"
-	"fmt"
-
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/traitmeta/metago/btc/ord-tools/ord"
 )
 
-func GetRevealOutValue(revealOutValue int64) int64 {
-	result := DefaultRevealOutValue // note: 铭文所在 UTXO 的 sats 数量
-	if revealOutValue >= MinRevealOutValue {
-		result = revealOutValue
-	}
-
-	return result
+type InscriptionRawTx struct {
+	TxPrevOutput   *wire.TxOut
+	WitnessScript  *RevealWitness
+	Size           int64
+	Raw            *wire.MsgTx
+	RevealOutValue int64
+	FeeRate        int64
+	PrivateKey     *btcec.PrivateKey
 }
 
-func EncodeTxToHex(tx *wire.MsgTx) (string, error) {
-	var buf bytes.Buffer
-	if err := tx.Serialize(&buf); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(buf.Bytes()), nil
+type SignInfo struct {
+	PrivateKey    *btcec.PrivateKey
+	RevealWitness *RevealWitness
+	RevealAccount *RevealAccount
 }
 
-func DecodeTxFromHex(txHex string) (*wire.MsgTx, error) {
-	decodeString, err := hex.DecodeString(txHex)
-	if err != nil {
-		return nil, err
-	}
-
-	tx := wire.NewMsgTx(wire.TxVersion)
-	if err := tx.Deserialize(bytes.NewReader(decodeString)); err != nil {
-		return nil, err
-	}
-
-	return tx, nil
+type RevealWitness struct {
+	SignatureWitness    []byte
+	InsWitnessScript    []byte
+	ControlBlockWitness []byte
 }
 
-func VerifySign(signature []byte, hash []byte, pubKey *btcec.PublicKey) (bool, error) {
-	signatureStruct, err := schnorr.ParseSignature(signature)
-	if err != nil {
-		return false, err
-	}
-
-	return signatureStruct.Verify(hash, pubKey), nil
+type RevealAccount struct {
+	CommitTxAddress       btcutil.Address
+	CommitTxPkScript      []byte
+	RecoveryPrivateKeyWIF string
 }
 
-func GetSatBytes(decimalNum int64) ([]byte, error) {
-	// Convert the decimal number to hexadecimal
-	hexStr := fmt.Sprintf("%x", decimalNum)
-	if len(hexStr)%2 != 0 {
-		// Pad with '0' if the length is odd
-		hexStr = "0" + hexStr
+func NewInscriptionWitness() *RevealWitness {
+	return &RevealWitness{
+		SignatureWitness:    make([]byte, 64),
+		InsWitnessScript:    nil,
+		ControlBlockWitness: make([]byte, 33),
 	}
-
-	// Convert the hexadecimal string to byte array
-	hexBytes, err := hex.DecodeString(hexStr)
-	if err != nil {
-		return nil, err
-	}
-
-	// Reverse the byte array by swapping elements in-place
-	for i, j := 0, len(hexBytes)-1; i < j; i, j = i+1, j-1 {
-		hexBytes[i], hexBytes[j] = hexBytes[j], hexBytes[i]
-	}
-
-	return hexBytes, nil
 }
 
-func BuildInscriptionWitness(datas []InscriptionData, privateKey *btcec.PrivateKey, revealOutValue int64) ([]byte, error) {
+func NewInscriptionRawTx() *InscriptionRawTx {
+	return &InscriptionRawTx{
+		WitnessScript: NewInscriptionWitness(),
+	}
+}
+
+func (irt *InscriptionRawTx) SetTxPrevOutput(pkScript []byte, prevOutput int64) {
+	irt.TxPrevOutput = &wire.TxOut{
+		PkScript: pkScript,
+		Value:    prevOutput,
+	}
+}
+
+func (irt *InscriptionRawTx) SetWitnessScript(inscriptionWitnessScript []byte) {
+	irt.WitnessScript.InsWitnessScript = inscriptionWitnessScript
+}
+
+func (irt *InscriptionRawTx) SetSize(txSize int64) {
+	irt.Size = txSize
+}
+
+func (irt *InscriptionRawTx) CalcPrevOutput(revealOutValue, feeRate int64) int64 {
+	txFee := irt.Size * feeRate
+	prevOutput := revealOutValue + txFee
+	emptySignature := make([]byte, 64)
+	emptyControlBlockWitness := make([]byte, 33)
+	witnessSize := (wire.TxWitness{emptySignature, irt.WitnessScript.InsWitnessScript, emptyControlBlockWitness}.SerializeSize() + 2 + 3) / 4
+	// 初始化一个空的签名和控制块，计算单个铭文交易，witness部分的额外手续费，并更新totalPrevOutput
+	witnessFee := int64(witnessSize) * feeRate
+	prevOutput += witnessFee
+
+	return prevOutput
+}
+
+func BuildInscriptionWitness(datas []ord.InscriptionData, privateKey *btcec.PrivateKey, revealOutValue int64) ([]byte, error) {
 	totalInscriptionScript := make([]byte, 0)
 
 	for i, data := range datas {
@@ -111,7 +114,7 @@ func BuildInscriptionWitness(datas []InscriptionData, privateKey *btcec.PrivateK
 
 		if i != 0 { // note: 除了第一个铭文数据，其他的铭文数据都会添加一个Pointer信息
 			// modified: revealOutValue 转 十六进制 ；转 []byte 再倒叙
-			satBytes, err := GetSatBytes(revealOutValue * int64(i))
+			satBytes, err := ord.GetSatBytes(revealOutValue * int64(i))
 			if err != nil {
 				return nil, err
 			}
@@ -145,48 +148,4 @@ func BuildInscriptionWitness(datas []InscriptionData, privateKey *btcec.PrivateK
 	}
 
 	return totalInscriptionScript, nil
-}
-
-func SendRawTransaction(client *BlockchainClient, tx *wire.MsgTx) (*chainhash.Hash, error) {
-	if client.RpcClient != nil {
-		return client.RpcClient.SendRawTransaction(tx, false)
-	} else {
-		return client.BtcApiClient.BroadcastTx(tx)
-	}
-}
-
-func GetServiceFee(inscAmount int64) int64 {
-	if inscAmount <= 11 {
-		return 1000
-	} else if inscAmount <= 50 {
-		return inscAmount * 95
-	} else if inscAmount <= 100 {
-		return inscAmount * 90
-	} else if inscAmount <= 200 {
-		return inscAmount * 80
-	} else if inscAmount <= 400 {
-		return inscAmount * 70
-	} else if inscAmount <= 600 {
-		return inscAmount * 60
-	} else if inscAmount <= 1000 {
-		return inscAmount * 50
-	}
-
-	return inscAmount * 50
-}
-
-func getServiceFeePkScript(address string, net *chaincfg.Params) (*[]byte, error) {
-	// 解析接收地址
-	addr, err := btcutil.DecodeAddress(address, net)
-	if err != nil {
-		return nil, err
-	}
-
-	// 创建一个支付到该地址的脚本
-	pkScript, err := txscript.PayToAddrScript(addr)
-	if err != nil {
-		return nil, err
-	}
-
-	return &pkScript, nil
 }
