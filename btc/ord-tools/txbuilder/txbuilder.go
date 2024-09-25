@@ -25,7 +25,6 @@ type MintTxBuilder struct {
 	net               *chaincfg.Params
 	privateKey        *btcec.PrivateKey
 	prevOutputFetcher *txscript.MultiPrevOutFetcher
-	req               runes.EtchRequest
 }
 
 func CreateEmptyTx() *wire.MsgTx {

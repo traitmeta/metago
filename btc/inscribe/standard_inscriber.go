@@ -245,7 +245,6 @@ func (ins *StandardInscriber) InitAllScript(rawTxs []*InscriptionRawTx) ([]*Insc
 			CommitTxAddress:       commitTxAddress,
 			RecoveryPrivateKeyWIF: recoveryPrivateKeyWIF.String(),
 		}
-
 	}
 
 	return scripts, nil

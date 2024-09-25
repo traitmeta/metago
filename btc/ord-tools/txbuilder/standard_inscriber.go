@@ -1,8 +1,13 @@
 package txbuilder
 
 import (
+	"fmt"
+
+	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -29,6 +34,7 @@ type StandardInscriber struct {
 	serviceFeeReceiveAddr     string                        // note: 用于存储平台手续费的地址
 	revealTxPrevOutputFetcher *txscript.MultiPrevOutFetcher // note: 用于获取reveal tx的输入
 	middleTxPrevOutputFetcher *txscript.MultiPrevOutFetcher // note: 用于获取middle tx的输入
+	RawTxs                    []*InscriptionRawTx
 }
 
 func NewInscribeTool(net *chaincfg.Params, rpcclient *rpcclient.Client, serviceFeeReceiveAddr string) (*StandardInscriber, error) {
@@ -45,6 +51,7 @@ func NewInscribeTool(net *chaincfg.Params, rpcclient *rpcclient.Client, serviceF
 		revealTxPrevOutputFetcher: txscript.NewMultiPrevOutFetcher(nil),
 		middleTxPrevOutputFetcher: txscript.NewMultiPrevOutFetcher(nil),
 	}
+
 	return tool, nil
 }
 
@@ -65,26 +72,26 @@ func (ins *StandardInscriber) Init(req ord.InscriptionRequest) error {
 
 	ins.InitPrevOutputFetcher()
 	// 1. 构建空的交易
-	txs, err := ins.InitAllRevealTx(req.DataList, req.RevealOutValue)
+	ins.RawTxs, err = ins.InitAllRevealTx(req.DataList, req.RevealOutValue)
 	if err != nil {
 		return err
 	}
 
 	// 2. 构建所有的 铭文witness
 	for i, signInfo := range signInfos {
-		txs[i].PrivateKey = signInfo.PrivateKey
-		txs[i].WitnessScript = signInfo.RevealWitness
+		ins.RawTxs[i].PrivateKey = signInfo.PrivateKey
+		ins.RawTxs[i].WitnessScript = signInfo.RevealWitness
 	}
 
 	var totalPrevOutValue int64
-	for i, tx := range txs {
-		tx.SetSize(int64(tx.Raw.SerializeSize()))
+	for i, tx := range ins.RawTxs {
+		ins.RawTxs[i].SetSize(int64(tx.Raw.SerializeSize()))
 		prevOutValue := tx.CalcPrevOutput(req.RevealOutValue, req.FeeRate)
 		if i != 0 {
 			totalPrevOutValue += prevOutValue
 		}
 
-		tx.SetTxPrevOutput(signInfos[i].RevealAccount.CommitTxPkScript, prevOutValue)
+		ins.RawTxs[i].SetTxPrevOutput(signInfos[i].RevealAccount.CommitTxPkScript, prevOutValue)
 	}
 
 	return nil
@@ -136,9 +143,8 @@ func (ins *StandardInscriber) newEmptyRevealTx(index int, destination string, re
 
 // InitEmptyMiddleTx : 构造middleTx: 连接commit tx和（除了第一笔）reveal tx的中间tx： 包含reveal tx1 + commit tx2... + 手续费 + 找零
 func (ins *StandardInscriber) InitEmptyMiddleTx(txs []*InscriptionRawTx, totalRevealPrevOutput int64, revealOutValue, feeRate, inscAmount int64) (totalPrevOutput, serviceFee, minerFee int64, err error) {
-	emptySignature := make([]byte, 64)
-	emptyControlBlockWitness := make([]byte, 33)
-	fee := (int64(wire.TxWitness{emptySignature, txs[0].WitnessScript.InsWitnessScript, emptyControlBlockWitness}.SerializeSize()+2+3) / 4) * feeRate
+	middleWitness := txs[0].WitnessScript
+	fee := (int64(wire.TxWitness{middleWitness.SignatureWitness, middleWitness.InsWitnessScript, middleWitness.ControlBlockWitness}.SerializeSize()+2+3) / 4) * feeRate
 	minerFee += fee // note: minerFee 加上 见证文本费用
 	totalPrevOutput += txs[0].TxPrevOutput.Value
 
@@ -171,6 +177,82 @@ func (ins *StandardInscriber) InitEmptyMiddleTx(txs []*InscriptionRawTx, totalRe
 	}
 
 	return totalPrevOutput, serviceFee, minerFee, nil
+}
+
+// 1. fill commit tx value
+// 2. sign transaction
+func (ins *StandardInscriber) CompleteMiddleTx(commitTxHash string, actualMiddlePrevOutputFee int64) error {
+	newCommitTxHash, err := chainhash.NewHashFromStr(commitTxHash)
+	if err != nil {
+		return errors.Wrap(err, "failed converting transaction hash")
+	}
+
+	fmt.Println("newCommitTxHash", newCommitTxHash)
+	ins.RawTxs[0].TxPrevOutput.Value = actualMiddlePrevOutputFee
+	ins.middleTxPrevOutputFetcher.AddPrevOut(wire.OutPoint{
+		Hash:  *newCommitTxHash,
+		Index: uint32(0),
+	}, ins.RawTxs[0].TxPrevOutput)
+	ins.RawTxs[0].Raw.TxIn[0].PreviousOutPoint.Hash = *newCommitTxHash
+
+	witnessArray, err := txscript.CalcTaprootSignatureHash(txscript.NewTxSigHashes(ins.RawTxs[0].Raw, ins.middleTxPrevOutputFetcher),
+		txscript.SigHashDefault, ins.RawTxs[0].Raw, 0, ins.middleTxPrevOutputFetcher)
+	if err != nil {
+		return errors.Wrap(err, "calc tapscript signaturehash error")
+	}
+
+	priv := txscript.TweakTaprootPrivKey(privKey, []byte{})
+	signature, err := schnorr.Sign(priv, witnessArray)
+	if err != nil {
+		return errors.Wrap(err, "schnorr sign error")
+	}
+	witness := wire.TxWitness{signature.Serialize()}
+	middleTx.WireTx.TxIn[0].Witness = witness
+
+	revealWeight := blockchain.GetTransactionWeight(btcutil.NewTx(middleTx.WireTx))
+	if revealWeight > MaxStandardTxWeight {
+		return errors.New(fmt.Sprintf("middle transaction weight greater than %d (MAX_STANDARD_TX_WEIGHT): %d", MaxStandardTxWeight, revealWeight))
+	}
+
+	return nil
+}
+
+func (b *StandardInscriber) CompleteRevealTxs(revealTxs []*WrapTx, pkAndScripts []*WalletInfo, middleTxHash chainhash.Hash) error {
+	for i := range revealTxs {
+		revealTxs[i].TxPrevOutputFetcher.AddPrevOut(wire.OutPoint{
+			Hash:  middleTxHash,
+			Index: uint32(i),
+		}, revealTxs[i].PrevOutput)
+
+		revealTxs[i].WireTx.TxIn[0].PreviousOutPoint.Hash = middleTxHash
+	}
+
+	for i := range revealTxs {
+		idx := 0
+
+		witnessArray, err := txscript.CalcTaprootSignatureHash(txscript.NewTxSigHashes(revealTxs[i].WireTx, revealTxs[i].TxPrevOutputFetcher),
+			txscript.SigHashDefault, revealTxs[i].WireTx, idx, revealTxs[i].TxPrevOutputFetcher)
+		if err != nil {
+			return errors.Wrap(err, "calc tapscript signaturehash error")
+		}
+
+		priv := txscript.TweakTaprootPrivKey(*pkAndScripts[i+1].PrivateKey, []byte{})
+		signature, err := schnorr.Sign(priv, witnessArray)
+		if err != nil {
+			return errors.Wrap(err, "schnorr sign error")
+		}
+
+		revealTxs[i].WireTx.TxIn[0].Witness = wire.TxWitness{signature.Serialize()}
+	}
+
+	// check tx max tx wight
+	for i, tx := range revealTxs {
+		revealWeight := blockchain.GetTransactionWeight(btcutil.NewTx(tx.WireTx))
+		if revealWeight > MaxStandardTxWeight {
+			return errors.New(fmt.Sprintf("reveal(index %d) transaction weight greater than %d (MAX_STANDARD_TX_WEIGHT): %d", i, MaxStandardTxWeight, revealWeight))
+		}
+	}
+	return nil
 }
 
 func GetServiceFee(inscAmount int64) int64 {
